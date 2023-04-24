@@ -1,0 +1,18 @@
+include MANIFEST.in
+include requirements.txt
+include *.json
+include *.md
+include *.py
+include *.txt
+recursive-include hollow_blocks *.css
+recursive-include hollow_blocks *.csv
+recursive-include hollow_blocks *.html
+recursive-include hollow_blocks *.ico
+recursive-include hollow_blocks *.js
+recursive-include hollow_blocks *.json
+recursive-include hollow_blocks *.md
+recursive-include hollow_blocks *.png
+recursive-include hollow_blocks *.py
+recursive-include hollow_blocks *.svg
+recursive-include hollow_blocks *.txt
+recursive-exclude hollow_blocks *.pyc
