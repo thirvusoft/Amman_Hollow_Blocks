@@ -29,7 +29,14 @@ app_license = "MIT"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {"Lead" : "hollow_blocks/custom/js/lead.js",
+"Opportunity" : "hollow_blocks/custom/js/opportunity.js",
+"Sales Order" : "hollow_blocks/custom/js/Sales_order.js",
+"Sales Invoice" : "hollow_blocks/custom/js/sales_invoice.js",
+"Quotation" : "hollow_blocks/custom/js/quotation.js",
+"Customer" : "hollow_blocks/custom/js/customer.js",
+"Delivery Note" : "hollow_blocks/custom/js/delivery_note.js",
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
