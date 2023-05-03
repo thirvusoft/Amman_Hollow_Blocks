@@ -11,7 +11,7 @@ app_license = "MIT"
 # ------------------
 
 # include js, css files in header of desk.html
-app_include_css = ["holllow_blocks.bundlescss"]
+app_include_css = ["holllow_blocks.bundle.scss"]
 app_include_js = ["hollow_blocks.bundle.js"]
 
 # include js, css files in header of web template
