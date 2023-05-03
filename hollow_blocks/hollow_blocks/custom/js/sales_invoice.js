@@ -16,8 +16,7 @@ frappe.ui.form.on('Sales Invoice Item', {
         let data=locals[cdt][cdn]
       
         if(data.item_code){
-            transaction_history(data,frm)
-            frm.fields_dict.transaction.html()
+            transaction_history(data,frm)       
            }
         else{
             frm.fields_dict.transaction.html()
