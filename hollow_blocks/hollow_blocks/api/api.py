@@ -1,3 +1,4 @@
+from hollow_blocks.hollow_blocks.api.sitecartlist import get_item_image_attachments
 import frappe
 from json import loads
 import json
@@ -290,7 +291,7 @@ def login(args):
 				"name":user.full_name,
 				"customer":customer.name or "",
 				"mobile_no":user.mobile_no,
-				"email":user.email,
+				"email":user.name,
 				"address": address.address_line1 or "",
 				"city":address.city or "",
 				"gstin":address.gstin or "",
@@ -461,7 +462,7 @@ def signup(args):
 @frappe.whitelist(allow_guest=True)
 def pricing_rule():
 	data={}
-	pricing_rule = frappe.db.get_all("Pricing Rule",filters={"selling":1})
+	pricing_rule = frappe.db.get_all("Pricing Rule",filters={"selling":1,"disable":0})
 
 	for j in pricing_rule:
 		pricing_doc = frappe.get_doc("Pricing Rule",j['name'])
@@ -502,6 +503,7 @@ def site_list(args):
 			m.update({
 				"status":project_doc.status,
 				"name":project_doc.project_name,
+				"id":project_doc.name
 				})
 	else:
 		site_list = frappe.db.get_all('Project',filters={"customer":args["customer"]})
@@ -511,6 +513,7 @@ def site_list(args):
 			m.update({
 				"status":project_doc.status,
 				"name":project_doc.project_name,
+				"id":project_doc.name
 				})
 
 	data["site_list"]=site_list
@@ -529,13 +532,127 @@ def item_group_list():
 		final_list.append(i["name"])
 	return final_list
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def item_list():
-	item_list = item_list=frappe.get_all("Item",filters={"disabled":0,"has_variants":0},fields=["item_code","image","description","standard_rate","stock_uom","item_group","name"],limit=10)
+	
+	item_list = item_list=frappe.get_all("Item",filters={"disabled":0,"has_variants":0},fields=["item_code","description","stock_uom as uom","item_group","name"])
 		
-	for m in item_list:
-		v=frappe.get_all("Item Price List",filters={"item_code":i["item_code"],"selling":1,"price_list":"Standard Selling","valid_from":("<=",today())},fields=["name"])
-		d=frappe.get_doc("Item Price List"v[0]["name"])
-		if v[0]:
-            d=frappe.get_doc("Item Price",v[0]["name"])
-        	i.update({"price":d.price_list_rate})
+	for m in item_list:	
+		m.update({"currency":"₹","favourite":True,"offer":"","price_list_rate":""})
+		v=frappe.get_all("Item Price",filters={"item_code":m["item_code"],"selling":1,"price_list":"Standard Selling","valid_from":("<=",today())},fields=["name"])
+		discount=frappe.get_all("Pricing Rule Item Code")
+		
+		if v:
+			d=frappe.get_doc("Item Price",v[0]["name"])
+			m.update({"price_list_rate":d.price_list_rate,})
+		
+		m.update({
+		"image":get_item_image_attachments(m['item_code'], {})
+		})
+		for j in frappe.get_all("Pricing Rule",filters={"disable":0,"selling":1,"apply_on":"Item Code"}):
+			pricing_doc=frappe.get_doc("Pricing Rule",j["name"])
+			for i in pricing_doc.items:
+				if i.item_code == m["item_code"]:
+					m.update({
+						"offer_id":pricing_doc.name})
+					if pricing_doc.rate_or_discount == "Discount Percentage":
+						m.update({
+						"offer":str(pricing_doc.discount_percentage or 0) + "%"})
+					if pricing_doc.rate_or_discount == "Discount Amount":
+						m.update({
+						"offer":str(pricing_doc.discount_amount or 0) + " Amount Discount"})
+					if pricing_doc.min_qty:
+						m.update({
+						"min_qty":pricing_doc.min_qty,
+						})
+					if pricing_doc.max_qty:
+						m.update({
+						"max_qty":pricing_doc.max_qty,
+						})
+					if pricing_doc.min_amt:
+						m.update({
+						"max_qty":pricing_doc.min_amt,
+						})
+					if pricing_doc.max_amt:
+						m.update({
+						"max_qty":pricing_doc.max_amt,
+						})
+
+
+	return item_list
+
+
+
+
+@frappe.whitelist(allow_guest=True)
+def sitelit_with_orderitems():
+	data={}
+	site_list=frappe.get_all("Project",{"customer":"testing"})
+	for k in site_list:
+		salesdoc_list=frappe.get_all("Sales Order",{"project":k['name']})
+		for j in salesdoc_list:
+			salesord_doc = frappe.get_doc('Sales Order',j['name'])
+			
+			item_list = []
+			for item in salesord_doc.items:
+				item_details = frappe._dict()
+				item_details.update({
+					"item":item.item_code,
+					"qty":item.qty,
+					"image":f"""{"http://"+frappe.local.request.host+item.image}"""
+					
+				})
+				item_list.append(item_details)
+				j.update({
+					"cart_items":item_list
+				})
+	data["site_list"]=salesdoc_list
+	return data
+
+
+
+@frappe.whitelist()
+def logout():
+   api_key = frappe.request.headers.get('Authorization').split(' ')[1].split(':')[0]
+   user = frappe.db.get_value("User", {"api_key": api_key})
+ 
+   login_manager = frappe.auth.LoginManager()
+   login_manager.logout(user = user)
+   generate_token(user)
+   return {"message": "Successfully Logged Out"}
+
+
+
+@frappe.whitelist()
+def site_creation(args):
+	try:
+		project_doc=frappe.new_doc("Project")
+		project_doc.project_name=args["site_name"]
+		project_doc.customer=args["customer"]
+		project_doc.save(ignore_permissions = True)
+		address = frappe.new_doc("Address")
+		address.address_title = args["site_name"]
+		address.address_line1 = args["address"]
+		address.city = args["city"]
+		address.pincode = args["pincode"]
+		address.append('links', {
+					"link_doctype": "Project",
+					"link_name": project_doc.name
+					})
+		address.save(ignore_permissions = True)
+		project_doc.address=address.name
+		project_doc.save(ignore_permissions = True)
+		return {"message": "Successfully Site Created"}
+	except:
+		return {"message": "Site Creation Failed Once Check Enter Deatils"}
+
+
+@frappe.whitelist()
+def site_status_updation(args):
+	try:
+		project_doc=frappe.get_doc("Project",args["id"])
+		project_doc.status=args["status"]
+		project_doc.save(ignore_permissions=True)
+		return {"message": "Successfully Site Status Updated"}
+	except:
+		return {"message": "Site Status Updation Failed Once Check Enter Deatils"}
