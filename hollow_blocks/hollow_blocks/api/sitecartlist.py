@@ -10,21 +10,25 @@ def get_item_image_attachments(item_code, item_attachments):
     return item_attachments[item_code]
 
 @frappe.whitelist()
-def getsitecartlist():
+def getsitecartlist(project=None):
     user = frappe.session.user or user
     customer = frappe.db.get_value("Customer", {"user": user}, "name")
     sitelist = []
     if customer:
         item_attachments = {}
-        solist = frappe.db.get_list("Sales Order", filters={"docstatus": 0, "customer": customer, 'project': ['is', 'set']}, fields=["name", "project"])
-        projects = frappe.db.get_list("Project", {'customer': customer, 'status': ['not in', ['Completed', 'Cancelled']]}, pluck="name")
-        so_projects = [i.project for i in solist]
-        for pr in projects:
-            if pr not in so_projects:
-                solist.append({
-                    'name': '',
-                    'project': pr
-                })
+        filters = {"docstatus": 0, "customer": customer, 'project': ['is', 'set']}
+        if project:
+            filters['project'] = project
+        solist = frappe.db.get_list("Sales Order", filters=filters, fields=["name", "project"])
+        if not project:
+            projects = frappe.db.get_list("Project", {'customer': customer, 'status': ['not in', ['Completed', 'Cancelled']]}, pluck="name")
+            so_projects = [i.project for i in solist]
+            for pr in projects:
+                if pr not in so_projects:
+                    solist.append({
+                        'name': '',
+                        'project': pr
+                    })
 
         for name in solist:
             sitedetails={
@@ -101,7 +105,39 @@ def updateCartItems(sales_order, items):
         "items": [item for item in items if item.get('qty')]
     })
     if not sales_order.items:
-            sales_order.delete()f
-    sales_order.save()
+        sales_order.delete()
+        frappe.local.response['delete'] = True
+    else:
+        sales_order.save()
     frappe.db.commit()
+    frappe.local.response["show_alert"] = {
+        'message': 'Cart Updated!', 
+        'indicator': 'green'
+    }
     return getsitecartlist()
+
+@frappe.whitelist()
+def submitCartOrder(sales_order, delivery_date=None):
+    try:
+        doc=frappe.get_doc("Sales Order", sales_order)
+        if delivery_date:
+            doc.update({
+                "delivery_date": delivery_date
+            })
+            for item in doc.items:
+                item.delivery_date = delivery_date
+
+        doc.save()
+        doc.submit()
+        frappe.local.response['show_alert'] = {
+            "message": "Order Placed!",
+            "indicator": "green"
+        }
+        return getsitecartlist()
+    except:
+        frappe.log_error(title=f"API - delivery_date  {sales_order}  {delivery_date}", message=frappe.get_traceback())
+        frappe.local.response['show_alert'] = {
+            "message": "OOPS! Something went wrong.",
+            "indicator": "red"
+        }
+        frappe.local.response['http_status_code'] = 500

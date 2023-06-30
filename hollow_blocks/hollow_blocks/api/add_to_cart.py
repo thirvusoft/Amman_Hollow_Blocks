@@ -6,7 +6,7 @@ def addToCart(itemcode, sitewiseqty):
     sitewiseqty = (json.loads(sitewiseqty) if(isinstance(sitewiseqty, str)) else sitewiseqty)
     for site in sitewiseqty:
         qty = site.get('qty') or 0
-        so_list = frappe.get_all("Sales Order", {'project': site.get('name')})
+        so_list = frappe.get_all("Sales Order", {'project': site.get('name'), 'docstatus': 0})
         if not so_list and not (qty if not (isinstance(qty, str)) else qty not in ['0', '0.0', '0.00']):
             continue
 
@@ -40,10 +40,12 @@ def addToCart(itemcode, sitewiseqty):
         frappe.local.response['sales_order'] = sales_order.name
         if not sales_order.items:
             sales_order.delete()
-        sales_order.save()
+            frappe.local.response['delete'] = True
+        else:
+            sales_order.save()
         frappe.db.commit()
     
-    frappe.local.response['show_alert'] = json.dumps({
+    frappe.local.response['show_alert'] = {
         'message': 'Cart Updated!',
         'indicator': 'green'
-    })
+    }
