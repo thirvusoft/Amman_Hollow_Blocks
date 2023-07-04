@@ -1,5 +1,5 @@
 (() => {
-  // frappe-html:/home/nandhini/bench14/frappe-bench/apps/hollow_blocks/hollow_blocks/public/html/transaction_history.html
+  // frappe-html:/home/frappe/frappe-bench/apps/hollow_blocks/hollow_blocks/public/html/transaction_history.html
   frappe.templates["transaction_history"] = `
 
    
@@ -31,4 +31,4 @@
 
 `;
 })();
-//# sourceMappingURL=hollow_blocks.bundle.2FMW22D4.js.map
+//# sourceMappingURL=hollow_blocks.bundle.QUNPX4ZG.js.map

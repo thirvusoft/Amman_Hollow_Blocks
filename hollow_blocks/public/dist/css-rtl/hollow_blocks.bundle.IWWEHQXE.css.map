@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../../../../../../../../tmp/tmp-31317-xpMsSxFxry2L/hollow_blocks/hollow_blocks/public/hollow_blocks.bundle.css"],
-  "sourcesContent": ["\n.tab1{\n    width:100%;\n    overflow:hidden;\n}\n.btn-close\n{\n  display:block;\n  box-sizing:border-box;\n  width:20px;\n  height:20px;\n  border-width:3px;\n  border-style: solid;\n  border-color:red;\n  border-radius:100%;\n  background: -webkit-linear-gradient(45deg, transparent 0%, transparent 46%, white 46%,  white 56%,transparent 56%, transparent 100%), -webkit-linear-gradient(-45deg, transparent 0%, transparent 46%, white 46%,  white 56%,transparent 56%, transparent 100%);\n  background-color:red;\n  box-shadow:0px 0px 5px 2px rgba(0,0,0,0.5);\n  transition: all 0.3s ease;\n}\n\n.table-container {\n    position: relative;\n}\n\n.close-button {\n    position: absolute;\n    top: 0;\n    left: 0;\n    margin: 10px;\n    padding: 5px 10px;\n    background-color: #ccc;\n    border: none;\n    border-radius: 5px;\n    cursor: pointer;\n}\n.close-x {\n    background: rgb(0 0 0 / 29%) !important;\n    height: 25px;\n    width: 25px;\n    text-align: center !important;\n    border-radius: 50%;\n    display: inline-block;\n    color: black;\n    transition: transform 0.2s;\n}"],
-  "mappings": ";AACA;AACI;AACA;AAAA;AAEJ;AAEE;AACA;AACA;AACA;AACA;AACA;AACA;AACA;AACA;AACA;AACA;AACA;AAAA;AAGF;AACI;AAAA;AAGJ;AACI;AACA;AACA;AACA;AACA;AACA;AACA;AACA;AACA;AAAA;AAEJ;AACI;AACA;AACA;AACA;AACA;AACA;AACA;AACA;AAAA;",
-  "names": []
-}
