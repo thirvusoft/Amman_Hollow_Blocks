@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../../../../../../tmp/tmp-166963-otSM4Fm6uP6D/hollow_blocks/hollow_blocks/public/hollow_blocks.bundle.css"],
+  "sourcesContent": [".tab1 {\n  width: 100%;\n  overflow: hidden;\n}\n\n.close-x {\n  background: rgba(0, 0, 0, 0.29) !important;\n  height: 25px;\n  width: 25px;\n  text-align: center !important;\n  border-radius: 50%;\n  display: inline-block;\n  color: black;\n  transition: transform 0.2s;\n}"],
+  "mappings": ";AAAA;AACE;AACA;AAAA;AAGF;AACE;AACA;AACA;AACA;AACA;AACA;AACA;AACA;AAAA;",
+  "names": []
+}
