@@ -4,6 +4,7 @@ import json
 import re
 from frappe.utils import today
 from erpnext.accounts.party import get_dashboard_info
+from hollow_blocks.hollow_blocks.api.sitecartlist import getsitecartlist
 
 @frappe.whitelist(allow_guest=True)
 def transactions(args):
@@ -494,6 +495,11 @@ def login(args):
 	
 	if cust:
 		customer = frappe.get_doc("Customer", cust)
+		image = user.user_image or ""
+
+		if image.startswith("/private") or image.startswith('/public') or image.startswith('/files'):
+			image = f"{frappe.utils.get_url()}{image}"
+
 		if customer and customer.customer_primary_address: 
 			info=get_dashboard_info("Customer",customer.name)
 			total=0
@@ -512,9 +518,9 @@ def login(args):
 				"address": address.address_line1 or "",
 				"city":address.city or "",
 				"gstin":address.gstin or "",
-				"outstanding":total or "",
+				"outstanding":total or 0.0,
 				"pincode":address.pincode or "",
-				
+				"user_image": image
 		}
 
 		elif customer:
@@ -531,7 +537,7 @@ def login(args):
 				"refered_by":"",
 				"gstin":"",
 				"pincode":"",
-				
+				"user_image": image
 			}
 	else:
 		frappe.response["message"] = {
@@ -636,6 +642,8 @@ def signup(args):
 	address.address_title = args["name"]
 	address.address_line1 = args["address"]
 	address.city = args["city"]
+	address.state = args.get("state")
+	address.gst_state = args.get('state')
 	if args["gstin"]:
 		address.gstin = args["gstin"]
 		address.gst_category="Registered Regular"
@@ -778,16 +786,27 @@ def logout():
 
 @frappe.whitelist()
 def site_creation(args):
+	message = "created"
 	try:
 		project_doc=frappe.new_doc("Project")
-		project_doc.project_name=args["site_name"]
-		project_doc.customer=args["customer"]
+		project_doc.project_name=args.get("sitename")
+
+		if frappe.db.exists("Project", {"project_name": args.get('sitename')}):
+			frappe.local.response["show_alert"] = {
+				"message": "Project name must be unique.",
+				"indicator": "red"
+			}
+			return
+
+		project_doc.customer=args.get("customer")
 		project_doc.save(ignore_permissions = True)
 		address = frappe.new_doc("Address")
-		address.address_title = args["site_name"]
-		address.address_line1 = args["address"]
-		address.city = args["city"]
-		address.pincode = args["pincode"]
+		address.address_title = args.get("sitename")
+		address.address_line1 = args.get("siteaddress")
+		address.city = args.get("sitecity")
+		address.state = args.get("sitestate")
+		address.country = args.get("sitecountry")
+		address.pincode = args.get("sitepincode")
 		address.append('links', {
 					"link_doctype": "Project",
 					"link_name": project_doc.name
@@ -795,21 +814,38 @@ def site_creation(args):
 		address.save(ignore_permissions = True)
 		project_doc.address=address.name
 		project_doc.save(ignore_permissions = True)
-		return {"message": "Successfully Site Created"}
+		frappe.local.response["show_alert"] = {
+			"message": "Site Created Successfully!", 
+			"indicator": "green"
+		}
+		message = "created"
 	except:
-		return {"message": "Site Creation Failed Once Check Enter Deatils"}
+		message = "Site creation failed, Please check the entered deatils."
+		frappe.local.response["show_alert"] = {
+			"message": "Site creation failed, Please check the entered deatils.",
+			"indicator": "red"
+		}
+	
+	frappe.local.response['site_list'] = getsitecartlist()
+	return message
 
 
 @frappe.whitelist()
 def site_status_updation(args):
+	updated = False
+	message = {}
 	try:
 		project_doc=frappe.get_doc("Project",args["id"])
 		project_doc.status=args["status"]
-		project_doc.save(ignore_permissions=True)
-		return {"message": "Successfully Site Status Updated"}
+		project_doc.save()
+		updated = True
+		message = {"message": "Successfully Site Status Updated", "indicator": "green"}
 	except:
-		return {"message": "Site Status Updation Failed Once Check Enter Deatils"}
-
+		frappe.log_error()
+		message = {"message": "Site Status Updation Failed Once Check Enter Deatils", "indicator": "red"}
+	
+	frappe.local.response['show_alert'] = message
+	return "updated" if updated else ""
 
 
 @frappe.whitelist(allow_guest=True)
@@ -835,3 +871,13 @@ def project_list(args):
 			project_list.append(m["name"])
 	
 	return project_list
+
+@frappe.whitelist()
+def get_user_imgae():
+	user = frappe.get_doc("User", frappe.session.user)
+	image = user.user_image or ""
+
+	if image.startswith("/private") or image.startswith('/public') or image.startswith('/files'):
+		image = f"{frappe.utils.get_url()}{image}"
+
+	return image

@@ -10,7 +10,7 @@ def get_item_image_attachments(item_code, item_attachments):
     return item_attachments[item_code]
 
 @frappe.whitelist()
-def getsitecartlist(project=None):
+def getsitecartlist(project=None, allsites=False):
     user = frappe.session.user or user
     customer = frappe.db.get_value("Customer", {"user": user}, "name")
     sitelist = []
@@ -21,7 +21,11 @@ def getsitecartlist(project=None):
             filters['project'] = project
         solist = frappe.db.get_list("Sales Order", filters=filters, fields=["name", "project"])
         if not project:
-            projects = frappe.db.get_list("Project", {'customer': customer, 'status': ['not in', ['Completed', 'Cancelled']]}, pluck="name")
+            filters = {'customer': customer}
+            if not allsites:
+                filters['status'] = ['not in', ['Completed', 'Cancelled']]
+
+            projects = frappe.db.get_list("Project", filters, pluck="name")
             so_projects = [i.project for i in solist]
             for pr in projects:
                 if pr not in so_projects:
@@ -33,6 +37,8 @@ def getsitecartlist(project=None):
         for name in solist:
             sitedetails={
                 "name": name['project'],
+                "status": frappe.db.get_value("Project", name["project"], "status"),
+                "project_name": frappe.db.get_value("Project", name["project"], "project_name"),
                 "qty": 0,
                 "amount": 0,
                 'cart_items': [],
