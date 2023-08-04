@@ -1,5 +1,6 @@
 import frappe
 import json
+from frappe.utils import flt
 from erpnext.stock.get_item_details import get_item_details
 
 def get_item_image_attachments(item_code, item_attachments):
@@ -54,11 +55,12 @@ def getsitecartlist(project=None, allsites=False):
                     },
                     fields=[
                         "item_code", 
-                        "cast(ifnull(qty, 0) as int) as qty",
-                        "rate",
-                        "amount",
+                        "cast(ifnull(sum(qty), 0) as int) as qty",
+                        "avg(rate) as rate",
+                        "sum(amount) as amount",
                         "'$' as currency"
-                        ]
+                        ],
+                    group_by = "item_code"
                 )
                 for item in cart_items:
                     item.update({
@@ -108,7 +110,7 @@ def updateCartItems(sales_order, items):
         if 'image' in i:
             del i['image']
     sales_order.update({
-        "items": [item for item in items if item.get('qty')]
+        "items": [item for item in items if flt(item.get('qty'))]
     })
     if not sales_order.items:
         sales_order.delete()

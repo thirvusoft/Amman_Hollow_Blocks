@@ -1,13 +1,20 @@
 import frappe
 import json
+from frappe.utils import flt
 
 @frappe.whitelist()
 def addToCart(itemcode, sitewiseqty):
     sitewiseqty = (json.loads(sitewiseqty) if(isinstance(sitewiseqty, str)) else sitewiseqty)
     for site in sitewiseqty:
-        qty = site.get('qty') or 0
-        so_list = frappe.get_all("Sales Order", {'project': site.get('name'), 'docstatus': 0})
-        if not so_list and not (qty if not (isinstance(qty, str)) else qty not in ['0', '0.0', '0.00']):
+        qty = flt(site.get('qty') or 0)
+        so_filters = {'project': site.get('name'), 'docstatus': 0}
+        if site.get("sales_order") and frappe.db.exists("Sales Order", {
+            "name": site.get("sales_order")
+        }):
+            so_filters["name"] = site.get("sales_order")
+            
+        so_list = frappe.get_all("Sales Order", so_filters)
+        if not so_list and not qty:
             continue
 
         if not so_list:
@@ -42,7 +49,23 @@ def addToCart(itemcode, sitewiseqty):
             sales_order.delete()
             frappe.local.response['delete'] = True
         else:
+            items = sales_order.items
+            update_items = []
+            count = 0
+            for row in items or []:
+                if row.item_code == itemcode:
+                    if count == 0:
+                        row.qty = qty
+                        update_items.append(row)
+                        count += 1
+                else:
+                    update_items.append(row)
+            
+            sales_order.update({
+                "items": update_items
+            })
             sales_order.save()
+
         frappe.db.commit()
     
     frappe.local.response['show_alert'] = {

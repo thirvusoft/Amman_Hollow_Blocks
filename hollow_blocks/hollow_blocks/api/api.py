@@ -521,9 +521,25 @@ def duplicateSalesOrder(sales_order="", delivery_date=None):
 			"docstatus": 0,
 			"project": so_doc.project
 		})
+		items = sales_order.get("items") or []
+		append_items = []
+		added_item = []
+		for row in (doc.get("items") or []):
+			add = False
+			for i_row in items:
+				if i_row.item_code == row.item_code and row.item_code not in added_item:
+					i_row.qty += row.qty or 0
+					add = True
+					added_item.append(row.item_code)
+					continue
+			
+			if not add:
+				append_items.append(row)
+		
+		items += append_items
 
 		sales_order.update({
-			"items": (sales_order.get("items") or []) + (doc.get("items") or [])
+			"items": items
 		})
 		sales_order.save()
 
