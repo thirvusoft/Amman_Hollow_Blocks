@@ -4,7 +4,31 @@ from erpnext.stock.get_item_details import get_item_price
 
 @frappe.whitelist()
 def item_group_list():
-	return frappe.db.get_list("Item Group", pluck="name")
+    item_group = frappe.db.sql("""
+        SELECT
+            ig.name as item_group
+        FROM `tabItem Group` ig
+        WHERE
+            ig.is_group = 0
+        ORDER BY
+            IFNULL((
+                SELECT
+                    COUNT(soi.name)
+                FROM `tabSales Order Item` soi
+                WHERE
+                    soi.docstatus = 1 AND
+                    soi.item_group = ig.name
+            ), 0) + IFNULL((
+                SELECT
+                    COUNT(sii.name)
+                FROM `tabSales Invoice Item` sii
+                WHERE
+                    sii.docstatus = 1 AND
+                    sii.item_group = ig.name
+            ), 0) DESC
+    """, as_dict=True)
+
+    return [ig.get('item_group') for ig in item_group]
 
 @frappe.whitelist()
 def get_item_list():

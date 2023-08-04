@@ -1,4 +1,4 @@
-import frappe
+import frappe, erpnext
 from json import loads
 import json
 import re
@@ -6,460 +6,148 @@ from frappe.utils import today
 from erpnext.accounts.party import get_dashboard_info
 from hollow_blocks.hollow_blocks.api.sitecartlist import getsitecartlist
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def transactions(args):
-	# args=json.loads(args)
+	if isinstance(args, str):
+		args = josn.loads(args)
+
 	data={}
-	result=[]
-	if(args["customer"] and args["status"] and not args.get("site" or "")):
-		
-		## sales order
-		sales_ord_list = frappe.db.get_all('Sales Order',filters={"customer":args["customer"],"status":args["status"],"docstatus":1})
-		
-		for i in sales_ord_list:
-			sales_doc = frappe.get_doc('Sales Order',i['name'])
-			i.update({
-				"status":sales_doc.status,
-				"delivery_date":sales_doc.delivery_date,
-				"total_qty":sales_doc.total_qty,
-				"net_total":sales_doc.total,
-				"tax_amount":sales_doc.total_taxes_and_charges,
-				"grand_total":sales_doc.grand_total})
-			item_list = []
-			for item in sales_doc.items:
-				item_details = frappe._dict()
-				item_details.update({
-					"item_code":item.item_code,
-					"item_name":item.item_name,
-					"qty":item.qty,
-					"amount":item.amount,
-					"uom":item.uom,
-					"conversion_factor":item.conversion_factor
-				})
-				item_list.append(item_details)
-			i.update({
-				"items":item_list
-			})
-		## Delivery Note
-		delivery_note_list = frappe.db.get_all('Delivery Note',filters={"customer":args["customer"],"status":args["status"]})
-		
-		for k in delivery_note_list:
-			dn_doc = frappe.get_doc('Delivery Note',k['name'])
-			k.update({
-				"status":dn_doc.status,
-				"delivery_date":dn_doc.posting_date,
-				"total_qty":dn_doc.total_qty,
-				"net_total":dn_doc.total,
-				"tax_amount":dn_doc.total_taxes_and_charges,
-				"grand_total":dn_doc.grand_total})
-			item_list = []
-			for item in dn_doc.items:
-				item_details = frappe._dict()
-				item_details.update({
-					"item":item.item_code,
-					"item_name":item.item_name,
-					"qty":item.qty,
-					"amount":item.amount
-				})
-				item_list.append(item_details)
-			k.update({
-				"items":item_list
-			})
 
-		payment_entry = frappe.db.get_all('Payment Entry',filters={"party":args["customer"],"status":args["status"]})
-		
-		for m in payment_entry:
-			pay_doc = frappe.get_doc('Payment Entry',m['name'])
-			m.update({
-				
-				"date":pay_doc.posting_date,
-				"mode_of_payment":pay_doc.mode_of_payment,"paid_amount":pay_doc.paid_amount})
-				
-			item_list = []
-			for item in pay_doc.references:
-				item_details = frappe._dict()
-				item_details.update({
-					"doctype":item.reference_name,
-					"amount":item.total_amount,
-					
-				})
-				item_list.append(item_details)
-			m.update({
-				"items":item_list
-			})
+	user = frappe.session.user
+	customer = frappe.get_value("Customer", {"user": user}, "name")
+	if not customer:
+		return data
 
-
-		## sales invoice
-		sales_inv_list = frappe.db.get_all('Sales Invoice',filters={"customer":args["customer"],"status":args["status"]})
-		
-
-		for j in sales_inv_list:
-			sales_doc = frappe.get_doc('Sales Invoice',j['name'])
-			j.update({
-				"status":sales_doc.status,
-				"posting_date":sales_doc.posting_date,
-				"total_qty":sales_doc.total_qty,
-				"net_total":sales_doc.total,
-				"tax_amount":sales_doc.total_taxes_and_charges,
-				"grand_total":sales_doc.grand_total})
-			item_list = []
-			for item in sales_doc.items:
-				item_details = frappe._dict()
-				item_details.update({
-					"item":item.item_code,
-					"item_name":item.item_name,
-					"qty":item.qty,
-					"amount":item.amount
-				})
-				item_list.append(item_details)
-			j.update({
-				"items":item_list
-			})
+	filters = {
+		"customer": customer,
+		"docstatus": 1
+	}
+	if args.get("status"):
+		filters["status"] = args.get("status")
+	if args.get("site"):
+		filters["project"] = args.get("site")
 	
-	elif(args["customer"] and args["site"] and not args.get("status" or "")):
+	# SALES ORDER
+	so_list = frappe.db.get_all('Sales Order',filters=filters, fields = [
+		"name", "status", "delivery_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total",
+	])
+	for so in so_list:		
+		item_list = frappe.get_all("Sales Order Item", filters = {
+			"parenttype": "Sales Order",
+			"parent": so.name
+		}, fields = [
+			"item_code",
+			"item_name",
+			"qty",
+			"amount",
+			"uom",
+			"conversion_factor",
+		])
 		
-		## sales order
-		sales_ord_list = frappe.db.get_all('Sales Order',filters={"customer":args["customer"],"project":args["site"],"docstatus":1})
-		
-		for i in sales_ord_list:
-			sales_doc = frappe.get_doc('Sales Order',i['name'])
-			i.update({
-				"status":sales_doc.status,
-				"delivery_date":sales_doc.delivery_date,
-				"total_qty":sales_doc.total_qty,
-				"net_total":sales_doc.total,
-				"tax_amount":sales_doc.total_taxes_and_charges,
-				"grand_total":sales_doc.grand_total})
-			item_list = []
-			for item in sales_doc.items:
-				item_details = frappe._dict()
-				item_details.update({
-					"item_code":item.item_code,
-					"item_name":item.item_name,
-					"qty":item.qty,
-					"amount":item.amount,
-					"uom":item.uom,
-					"conversion_factor":item.conversion_factor
-				})
-				item_list.append(item_details)
-			i.update({
-				"items":item_list
-			})
-		## Delivery Note
-		delivery_note_list = frappe.db.get_all('Delivery Note',filters={"customer":args["customer"],"project":args["site"]})
-		
-		for k in delivery_note_list:
-			dn_doc = frappe.get_doc('Delivery Note',k['name'])
-			k.update({
-				"status":dn_doc.status,
-				"delivery_date":dn_doc.posting_date,
-				"total_qty":dn_doc.total_qty,
-				"net_total":dn_doc.total,
-				"tax_amount":dn_doc.total_taxes_and_charges,
-				"grand_total":dn_doc.grand_total})
-			item_list = []
-			for item in dn_doc.items:
-				item_details = frappe._dict()
-				item_details.update({
-					"item":item.item_code,
-					"item_name":item.item_name,
-					"qty":item.qty,
-					"amount":item.amount
-				})
-				item_list.append(item_details)
-			k.update({
-				"items":item_list
-			})
+		so.update({
+			"items":item_list
+		})
 
-		payment_entry = frappe.db.get_all('Payment Entry',filters={"party":args["customer"],"project":args["site"]})
-		
-		for m in payment_entry:
-			pay_doc = frappe.get_doc('Payment Entry',m['name'])
-			m.update({
-				
-				"date":pay_doc.posting_date,
-				"mode_of_payment":pay_doc.mode_of_payment,"paid_amount":pay_doc.paid_amount})
-				
-			item_list = []
-			for item in pay_doc.references:
-				item_details = frappe._dict()
-				item_details.update({
-					"doctype":item.reference_name,
-					"amount":item.total_amount,
-					
-				})
-				item_list.append(item_details)
-			m.update({
-				"items":item_list
-			})
+	# SALES INVOICE
+	sales_inv_list = frappe.db.get_all('Sales Invoice',filters=filters, fields = [
+		"status", "posting_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total"
+	])
+	for si in sales_inv_list:
+		item_list = item_list = frappe.get_all("Sales Invoice Item", filters = {
+			"parenttype": "Sales Invoice",
+			"parent": so.name
+		}, fields = [
+			"item_code as item",
+			"item_name",
+			"qty",
+			"amount",
+			"uom",
+			"conversion_factor",
+		])
 
-
-		## sales invoice
-		sales_inv_list = frappe.db.get_all('Sales Invoice',filters={"customer":args["customer"],"project":args["site"]})
-		
-
-		for j in sales_inv_list:
-			sales_doc = frappe.get_doc('Sales Invoice',j['name'])
-			j.update({
-				"status":sales_doc.status,
-				"posting_date":sales_doc.posting_date,
-				"total_qty":sales_doc.total_qty,
-				"net_total":sales_doc.total,
-				"tax_amount":sales_doc.total_taxes_and_charges,
-				"grand_total":sales_doc.grand_total})
-			item_list = []
-			for item in sales_doc.items:
-				item_details = frappe._dict()
-				item_details.update({
-					"item":item.item_code,
-					"item_name":item.item_name,
-					"qty":item.qty,
-					"amount":item.amount
-				})
-				item_list.append(item_details)
-			j.update({
-				"items":item_list
-			})
+		si.update({
+			"items":item_list
+		})
 	
-	elif(args["customer"] and args["status"] and args["site"]):
+	# DELIVERY NOTE
+	delivery_note_list = frappe.db.get_all('Delivery Note',filters=filters, fields = [
+		"name", "status", "posting_date as delivery_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total",
+	])
+	for dn in delivery_note_list:
+		item_list = frappe.get_all("Delivery Note Item", filters = {
+			"parenttype": "Delivery Note",
+			"parent": dn.name
+		}, fields = [
+			"item_code as item",
+			"item_name",
+			"qty",
+			"amount",
+			"uom",
+			"conversion_factor",
+		])
 		
-		## sales order
-		sales_ord_list = frappe.db.get_all('Sales Order',filters={"customer":args["customer"],"status":args["status"],"project":args["site"],"docstatus":1})
-		
-		for i in sales_ord_list:
-			sales_doc = frappe.get_doc('Sales Order',i['name'])
-			i.update({
-				"status":sales_doc.status,
-				"delivery_date":sales_doc.delivery_date,
-				"total_qty":sales_doc.total_qty,
-				"net_total":sales_doc.total,
-				"tax_amount":sales_doc.total_taxes_and_charges,
-				"grand_total":sales_doc.grand_total})
-			item_list = []
-			for item in sales_doc.items:
-				item_details = frappe._dict()
-				item_details.update({
-					"item_code":item.item_code,
-					"item_name":item.item_name,
-					"qty":item.qty,
-					"amount":item.amount,
-					"uom":item.uom,
-					"conversion_factor":item.conversion_factor
-				})
-				item_list.append(item_details)
-			i.update({
-				"items":item_list
-			})
-		## Delivery Note
-		delivery_note_list = frappe.db.get_all('Delivery Note',filters={"customer":args["customer"],"status":args["status"],"project":args["site"]})
-		
-		for k in delivery_note_list:
-			dn_doc = frappe.get_doc('Delivery Note',k['name'])
-			k.update({
-				"status":dn_doc.status,
-				"delivery_date":dn_doc.posting_date,
-				"total_qty":dn_doc.total_qty,
-				"net_total":dn_doc.total,
-				"tax_amount":dn_doc.total_taxes_and_charges,
-				"grand_total":dn_doc.grand_total})
-			item_list = []
-			for item in dn_doc.items:
-				item_details = frappe._dict()
-				item_details.update({
-					"item":item.item_code,
-					"item_name":item.item_name,
-					"qty":item.qty,
-					"amount":item.amount
-				})
-				item_list.append(item_details)
-			k.update({
-				"items":item_list
-			})
+		dn.update({
+			"items":item_list
+		})
 
-		payment_entry = frappe.db.get_all('Payment Entry',filters={"party":args["customer"],"status":args["status"],"project":args["site"]})
-		
-		for m in payment_entry:
-			pay_doc = frappe.get_doc('Payment Entry',m['name'])
-			m.update({
-				
-				"date":pay_doc.posting_date,
-				"mode_of_payment":pay_doc.mode_of_payment,"paid_amount":pay_doc.paid_amount})
-				
-			item_list = []
-			for item in pay_doc.references:
-				item_details = frappe._dict()
-				item_details.update({
-					"doctype":item.reference_name,
-					"amount":item.total_amount,
-					
-				})
-				item_list.append(item_details)
-			m.update({
-				"items":item_list
-			})
+	# PAYMENT ENTRY
+	pe_filters = filters
+	pe_filters['party'] = pe_filters["customer"]
+	del pe_filters['customer']
 
-
-		## sales invoice
-		sales_inv_list = frappe.db.get_all('Sales Invoice',filters={"customer":args["customer"],"status":args["status"],"project":args["site"]})
-		
-
-		for j in sales_inv_list:
-			sales_doc = frappe.get_doc('Sales Invoice',j['name'])
-			j.update({
-				"status":sales_doc.status,
-				"posting_date":sales_doc.posting_date,
-				"total_qty":sales_doc.total_qty,
-				"net_total":sales_doc.total,
-				"tax_amount":sales_doc.total_taxes_and_charges,
-				"grand_total":sales_doc.grand_total})
-			item_list = []
-			for item in sales_doc.items:
-				item_details = frappe._dict()
-				item_details.update({
-					"item":item.item_code,
-					"item_name":item.item_name,
-					"qty":item.qty,
-					"amount":item.amount
-				})
-				item_list.append(item_details)
-			j.update({
-				"items":item_list
-			})
+	payment_entry = frappe.db.get_all('Payment Entry',filters=pe_filters, fields= [
+		"name", "posting_date as date", "mode_of_payment", "paid_amount"
+	])
 	
+	for pe in payment_entry:
+		item_list = frappe.get_all("Payment Entry Reference", filters = {
+			"parenttype": "Payment Entry",
+			"parent": pe.name
+		}, fields = [
+			"reference_name as doctype",
+			"amount as total_amount"
+		])
+		pe.update({
+			"items":item_list
+		})
 
-	else:
-		
-		##sales order
-		sales_ord_list = frappe.db.get_all('Sales Order',filters={"customer":args["customer"],"docstatus":1})
-		
-		for i in sales_ord_list:
-			sales_doc = frappe.get_doc('Sales Order',i['name'])
-			i.update({
-				"status":sales_doc.status,
-				"delivery_date":sales_doc.delivery_date,
-				"total_qty":sales_doc.total_qty,
-				"net_total":sales_doc.total,
-				"tax_amount":sales_doc.total_taxes_and_charges,
-				"grand_total":sales_doc.grand_total})
-			item_list = []
-			for item in sales_doc.items:
-				item_details = frappe._dict()
-				item_details.update({
-					"item_code":item.item_code,
-					"item_name":item.item_name,
-					"qty":item.qty,
-					"amount":item.amount,
-					"uom":item.uom,
-					"conversion_factor":item.conversion_factor
-				})
-				item_list.append(item_details)
-			i.update({
-				"items":item_list
-			})
-		## Delivery Note
-		delivery_note_list = frappe.db.get_all('Delivery Note',filters={"customer":args["customer"]})
-		
-		for k in delivery_note_list:
-			dn_doc = frappe.get_doc('Delivery Note',k['name'])
-			k.update({
-				"status":dn_doc.status,
-				"delivery_date":dn_doc.posting_date,
-				"total_qty":dn_doc.total_qty,
-				"net_total":dn_doc.total,
-				"tax_amount":dn_doc.total_taxes_and_charges,
-				"grand_total":dn_doc.grand_total})
-			item_list = []
-			for item in dn_doc.items:
-				item_details = frappe._dict()
-				item_details.update({
-					"item":item.item_code,
-					"item_name":item.item_name,
-					"qty":item.qty,
-					"amount":item.amount
-				})
-				item_list.append(item_details)
-			k.update({
-				"items":item_list
-			})
-		## payment entry
-		payment_entry = frappe.db.get_all('Payment Entry',filters={"party":args["customer"]})
-		
-		for m in payment_entry:
-			pay_doc = frappe.get_doc('Payment Entry',m['name'])
-			m.update({
-			
-				"date":pay_doc.posting_date,
-				"paid_amount":pay_doc.paid_amount,
-				"mode_of_payment":pay_doc.mode_of_payment})
-			item_list = []
-			for item in pay_doc.references:
-				item_details = frappe._dict()
-				item_details.update({
-					"doctype":item.reference_name,
-					"amount":item.total_amount,
-					
-				})
-				item_list.append(item_details)
-			m.update({
-				"items":item_list
-			})
-
-		## sales invoice
-		sales_inv_list = frappe.db.get_all('Sales Invoice',filters={"customer":args["customer"]})
-		
-
-		for j in sales_inv_list:
-			sales_doc = frappe.get_doc('Sales Invoice',j['name'])
-			j.update({
-				"status":sales_doc.status,
-				"posting_date":sales_doc.posting_date,
-				"total_qty":sales_doc.total_qty,
-				"net_total":sales_doc.total,
-				"tax_amount":sales_doc.total_taxes_and_charges,
-				"grand_total":sales_doc.grand_total})
-			item_list = []
-			for item in sales_doc.items:
-				item_details = frappe._dict()
-				item_details.update({
-					"item":item.item_code,
-					"item_name":item.item_name,
-					"qty":item.qty,
-					"amount":item.amount
-				})
-				item_list.append(item_details)
-			j.update({
-				"items":item_list
-			})
-		
-
-	data["sales_order"]=sales_ord_list or []
+	data["sales_order"]=so_list or []
 	data["sales_invoice"]=sales_inv_list or []
 	data["delivery_note"]=delivery_note_list or []
 	data["payment_list"]=payment_entry or []
 	return data
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def company_details():
-	data=[]
-	company_dict={}
-	company=frappe.get_all("Company")
-	for i in company:
-		comp_doc=frappe.get_doc("Company",i["name"])
-		bank_doc=frappe.get_doc("Bank Account",{"is_company_account":1,"company":comp_doc.name})
-		company_dict.update({
-			"comp_name":comp_doc.name or "",
-			"gstin":comp_doc.gstin or "",
-			"pan":comp_doc.pan or "",
-			"phone":comp_doc.phone_no or "",
-			"bank_name":bank_doc.bank or "",
-			"branch_code":bank_doc.branch_code or "",
-			"acc_no":bank_doc.bank_account_no or ""
-		})
-		data.append(company_dict)
-	return data
+	company = frappe.get_doc("Company", erpnext.get_default_company())
 
-@frappe.whitelist(allow_guest=True)
+	data = [
+		{"label": "", "value": (company.name or "").upper(), "bold": "1"},
+		{"label": "GSTIN", "value": company.gstin or ""},
+		{"label": "PAN", "value": company.pan or ""},
+		{"label": "PHONE", "value": company.phone_no or ""},
+	]
+
+	if frappe.db.exists("Bank Account",{"is_company_account":1,"company":company.name}):
+		bank_doc=frappe.get_doc("Bank Account",{"is_company_account":1,"company":company.name})
+		data += [
+			{"label": "BANK", "value": bank_doc.bank or ""},
+			{"label": "BRANCH CODE", "value": bank_doc.branch_code or ""},
+			{"label": "Acc No", "value": bank_doc.bank_account_no or ""}
+		]
+
+	image = company.get("mobile_app_image") or ""
+
+	if image.startswith("/private") or image.startswith('/public') or image.startswith('/files'):
+		image = f"{frappe.utils.get_url()}{image}"
+
+	return {
+		'image': image, # pass image url to show in mobile app
+		'data': data
+		}
+
+@frappe.whitelist()
 def status_list():
 	data={}
 	sales_order=frappe.get_meta('Sales Order').get_field('status').options
@@ -474,7 +162,7 @@ def status_list():
 
 
 ## Login Api
-@frappe.whitelist( allow_guest=True )
+@frappe.whitelist(allow_guest=True)
 def login(args):
 	# args=json.loads(args)
 	try:
@@ -488,7 +176,6 @@ def login(args):
 			"message":"Incorrect Username or Password"
 		}
 		return
-	token = generate_token(frappe.session.user)
 	frappe.db.commit()
 	user = frappe.get_doc('User', frappe.session.user)
 	cust = frappe.db.get_value("Customer", {"user": user.name}, "name")
@@ -510,7 +197,6 @@ def login(args):
 			frappe.response["message"] = {
 
 				"message":"Logged In",
-				"token":token,
 				"name":user.full_name,
 				"customer":customer.name or "",
 				"mobile_no":user.mobile_no,
@@ -525,62 +211,21 @@ def login(args):
 
 		elif customer:
 			frappe.response["message"] = {
-
 				"message":"Logged In",
-				"token":token,
 				"name":user.full_name,
 				"customer":customer.name or "",
 				"mobile_no":user.mobile_no,
 				"email":user.email,
 				"address": "",
 				"city":"",
-				"refered_by":"",
 				"gstin":"",
 				"pincode":"",
 				"user_image": image
 			}
 	else:
 		frappe.response["message"] = {
-
 			"message":"Please Signup",
-			
 		}
-
-def generate_token(user):
-	user_details = frappe.get_doc("User", user)
-	api_key = user_details.api_key
-	api_secret = frappe.generate_hash(length=15)
-	# if api key is not set generate api key
-	if not user_details.api_key:
-		api_key = frappe.generate_hash(length=15)
-		user_details.api_key = api_key
-	user_details.api_secret = api_secret
-	user_details.save(ignore_permissions=True)
-
-	return f'token {api_key}:{api_secret}'
-
-# def generate_keys(user):
-# 	"""
-# 	generate api key and api secret
-
-# 	:param user: str
-# 	"""
-# 	# frappe.only_for("System Manager")
-# 	user_details = frappe.get_doc("User", user)
-# 	api_secret = frappe.generate_hash(length=15)
-# 	# if api key is not set generate api key
-# 	if not user_details.api_key:
-# 		api_key = frappe.generate_hash(length=15)
-# 		user_details.api_key = api_key
-# 	user_details.api_secret = api_secret
-
-# 	user_details.save()
-
-# 	return {"api_secret": api_secret}
-
-
-
-
 
 @frappe.whitelist(allow_guest=True)
 def signup(args):
@@ -684,7 +329,7 @@ def signup(args):
 
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def pricing_rule():
 	data={}
 	pricing_rule = frappe.db.get_all("Pricing Rule",filters={"selling":1,"disable":0})
@@ -714,13 +359,17 @@ def pricing_rule():
 
 	return data
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def site_list(args):
-	# args=json.loads(args)
+	if isinstance(args, str):
+		args=json.loads(args)
 	data={}
+	customer = frappe.db.get_value("Customer", {"user": frappe.session.user}, "name")
+	if not customer:
+		return data
 	## site list
-	if(args["customer"] and args["status"]):
-		site_list = frappe.db.get_all('Project',filters={"customer":args["customer"],"status":args["status"]})
+	if(customer and args["status"]):
+		site_list = frappe.db.get_all('Project',filters={"customer":customer,"status":args["status"]})
 		
 
 		for m in site_list:
@@ -731,7 +380,7 @@ def site_list(args):
 				"id":project_doc.name
 				})
 	else:
-		site_list = frappe.db.get_all('Project',filters={"customer":args["customer"]})
+		site_list = frappe.db.get_all('Project',filters={"customer":customer})
 	
 		for m in site_list:
 			project_doc = frappe.get_doc('Project',m['name'])
@@ -745,7 +394,7 @@ def site_list(args):
 
 	return data
 	
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def sitelit_with_orderitems():
 	data={}
 	site_list=frappe.get_all("Project",{"customer":"testing"})
@@ -779,13 +428,14 @@ def logout():
  
    login_manager = frappe.auth.LoginManager()
    login_manager.logout(user = user)
-   generate_token(user)
    return {"message": "Successfully Logged Out"}
 
 
 
 @frappe.whitelist()
 def site_creation(args):
+	user = frappe.session.user
+	customer = frappe.get_value("Customer", {"user": user}, "name")
 	message = "created"
 	try:
 		project_doc=frappe.new_doc("Project")
@@ -798,7 +448,7 @@ def site_creation(args):
 			}
 			return
 
-		project_doc.customer=args.get("customer")
+		project_doc.customer=customer
 		project_doc.save(ignore_permissions = True)
 		address = frappe.new_doc("Address")
 		address.address_title = args.get("sitename")
@@ -848,29 +498,55 @@ def site_status_updation(args):
 	return "updated" if updated else ""
 
 
-@frappe.whitelist(allow_guest=True)
-def sales_order_creation(args):
-	sales_doc=frappe.new_doc("Sales Order")
-	sales_doc.customer=args["customer"]
-	sales_doc.delivery_date=args["delivery_date"]
-	sales_doc.items=args["items"]
-	sales_doc.insert()
-	return sales_doc.name
-
-
-
-
-@frappe.whitelist(allow_guest=True)
-def project_list(args):
-	data={}
-	project_list=[""]
-	if(args["customer"]):
-		site_list = frappe.db.get_all('Project',filters={"customer":args["customer"]})
-		
-		for m in site_list:
-			project_list.append(m["name"])
+@frappe.whitelist()
+def duplicateSalesOrder(sales_order="", delivery_date=None):
+	if not delivery_date:
+		delivery_date = frappe.utils.nowdate()
 	
-	return project_list
+	if not frappe.db.exists("Sales Order", sales_order):
+		frappe.local.response["show_alert"] = {
+			"message": "Couldn't create sales order",
+			"indicator": "red"
+		}
+		return
+
+	so_doc = frappe.get_doc("Sales Order", sales_order)
+	doc = frappe.copy_doc(so_doc)
+	doc.delivery_date = delivery_date
+	if frappe.db.exists("Sales Order", {
+		"docstatus": 0,
+		"project": so_doc.project
+	}):
+		sales_order = frappe.get_doc("Sales Order", {
+			"docstatus": 0,
+			"project": so_doc.project
+		})
+
+		sales_order.update({
+			"items": (sales_order.get("items") or []) + (doc.get("items") or [])
+		})
+		sales_order.save()
+
+	else:
+		doc.save()
+
+	frappe.local.response["show_alert"] = {
+			"message": "New Order added in cart. Please find and checkout the items in cart to create sales order",
+			"indicator": "green",
+			"long_msg": True
+		}
+	
+	return 'created'
+
+@frappe.whitelist()
+def project_list():
+	data={}
+	user = frappe.session.user
+	customer = frappe.get_value("Customer", {"user": user}, "name")
+	if(customer):
+		site_list = frappe.db.get_all('Project',filters={"customer":customer}, fields=["name", "project_name"])
+		data = {site.project_name: site.name for site in site_list}
+	return data
 
 @frappe.whitelist()
 def get_user_imgae():
