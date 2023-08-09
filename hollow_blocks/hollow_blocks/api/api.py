@@ -2,8 +2,9 @@ import frappe, erpnext
 from json import loads
 import json
 import re
-from frappe.utils import today
+from frappe.utils import today, formatdate
 from erpnext.accounts.party import get_dashboard_info
+from frappe.utils.data import getdate
 from hollow_blocks.hollow_blocks.api.sitecartlist import getsitecartlist
 
 @frappe.whitelist()
@@ -29,7 +30,7 @@ def transactions(args):
 	
 	# SALES ORDER
 	so_list = frappe.db.get_all('Sales Order',filters=filters, fields = [
-		"name", "status", "delivery_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total",
+		"name", "status", "delivery_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total", "project"
 	])
 	for so in so_list:		
 		item_list = frappe.get_all("Sales Order Item", filters = {
@@ -45,17 +46,18 @@ def transactions(args):
 		])
 		
 		so.update({
+			"project_name": frappe.db.get_value("Project", so.get("project"), "project_name") if so.get("project") else "",
 			"items":item_list
 		})
 
 	# SALES INVOICE
 	sales_inv_list = frappe.db.get_all('Sales Invoice',filters=filters, fields = [
-		"status", "posting_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total"
+		"name", "status", "posting_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total", "project"
 	])
 	for si in sales_inv_list:
-		item_list = item_list = frappe.get_all("Sales Invoice Item", filters = {
+		item_list = frappe.get_all("Sales Invoice Item", filters = {
 			"parenttype": "Sales Invoice",
-			"parent": so.name
+			"parent": si.name
 		}, fields = [
 			"item_code as item",
 			"item_name",
@@ -66,12 +68,13 @@ def transactions(args):
 		])
 
 		si.update({
+			"project_name": frappe.db.get_value("Project", si.get("project"), "project_name") if si.get("project") else "",
 			"items":item_list
 		})
 	
 	# DELIVERY NOTE
 	delivery_note_list = frappe.db.get_all('Delivery Note',filters=filters, fields = [
-		"name", "status", "posting_date as delivery_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total",
+		"name", "status", "posting_date as delivery_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total", "project"
 	])
 	for dn in delivery_note_list:
 		item_list = frappe.get_all("Delivery Note Item", filters = {
@@ -87,6 +90,7 @@ def transactions(args):
 		])
 		
 		dn.update({
+			"project_name": frappe.db.get_value("Project", dn.get("project"), "project_name") if dn.get("project") else "",
 			"items":item_list
 		})
 
@@ -96,7 +100,7 @@ def transactions(args):
 	del pe_filters['customer']
 
 	payment_entry = frappe.db.get_all('Payment Entry',filters=pe_filters, fields= [
-		"name", "posting_date as date", "mode_of_payment", "paid_amount"
+		"name", "posting_date as date", "mode_of_payment", "paid_amount", "project"
 	])
 	
 	for pe in payment_entry:
@@ -108,6 +112,7 @@ def transactions(args):
 			"amount as total_amount"
 		])
 		pe.update({
+			"project_name": frappe.db.get_value("Project", pe.get("project"), "project_name") if pe.get("project") else "",
 			"items":item_list
 		})
 
@@ -164,7 +169,8 @@ def status_list():
 ## Login Api
 @frappe.whitelist(allow_guest=True)
 def login(args):
-	# args=json.loads(args)
+	if isinstance(args, str):
+		args=json.loads(args)
 	try:
 		login_manager = frappe.auth.LoginManager()
 		login_manager.authenticate(user=args["username"], pwd=args["password"])
@@ -172,56 +178,17 @@ def login(args):
 	except frappe.exceptions.AuthenticationError:
 		frappe.clear_messages()
 		frappe.local.response["message"] = {
-			
 			"message":"Incorrect Username or Password"
 		}
-		return
-	frappe.db.commit()
-	user = frappe.get_doc('User', frappe.session.user)
-	cust = frappe.db.get_value("Customer", {"user": user.name}, "name")
+		return "Failed"
 	
+	frappe.db.commit()
+	cust = frappe.db.get_value("Customer", {"user": frappe.session.user}, "name")
 	if cust:
-		customer = frappe.get_doc("Customer", cust)
-		image = user.user_image or ""
-
-		if image.startswith("/private") or image.startswith('/public') or image.startswith('/files'):
-			image = f"{frappe.utils.get_url()}{image}"
-
-		if customer and customer.customer_primary_address: 
-			info=get_dashboard_info("Customer",customer.name)
-			total=0
-			for i in info:
-				total+=i["total_unpaid"]
-
-			address = frappe.get_doc("Address", customer.customer_primary_address)
-			frappe.response["message"] = {
-
-				"message":"Logged In",
-				"name":user.full_name,
-				"customer":customer.name or "",
-				"mobile_no":user.mobile_no,
-				"email":user.name,
-				"address": address.address_line1 or "",
-				"city":address.city or "",
-				"gstin":address.gstin or "",
-				"outstanding":total or 0.0,
-				"pincode":address.pincode or "",
-				"user_image": image
+		frappe.response["message"] = {
+			"message":"Logged In"
 		}
 
-		elif customer:
-			frappe.response["message"] = {
-				"message":"Logged In",
-				"name":user.full_name,
-				"customer":customer.name or "",
-				"mobile_no":user.mobile_no,
-				"email":user.email,
-				"address": "",
-				"city":"",
-				"gstin":"",
-				"pincode":"",
-				"user_image": image
-			}
 	else:
 		frappe.response["message"] = {
 			"message":"Please Signup",
@@ -331,33 +298,48 @@ def signup(args):
 
 @frappe.whitelist()
 def pricing_rule():
-	data={}
-	pricing_rule = frappe.db.get_all("Pricing Rule",filters={"selling":1,"disable":0})
+	pricing_rule = frappe.db.get_all("Pricing Rule",filters = {
+		"selling": 1,
+		"disable": 0, 
+	})
+
+	item_list=frappe.db.get_list("Item",filters={
+        "disabled": 0,
+        "has_variants": 0,
+        "item_group": ["not in", frappe.db.get_list("Item Group", {"dont_show_in_mobile_app": 1}, pluck="name")]
+        }, pluck="name")
+	
+	item_pricing_rules = []
 
 	for j in pricing_rule:
 		pricing_doc = frappe.get_doc("Pricing Rule",j['name'])
+		if pricing_doc.valid_upto:
+			if getdate(pricing_doc.valid_upto) < getdate(frappe.utils.nowdate()):
+				continue
+
 		j.update({
 			"name":pricing_doc.title,
 			"display":pricing_doc.title,
 			"offer_id":pricing_doc.name,
 			"applicable_for":pricing_doc.applicable_for,
-			"valid_from":pricing_doc.valid_from,
-			"valid_upto":pricing_doc.valid_upto,
-			"min_qty":pricing_doc.min_qty})
-		item_list = []
-		for item in pricing_doc.items:
-			item_details = frappe._dict()
-			item_details.update({
-				"item":item.item_code
-				
-			})
-			item_list.append(item_details)
-		j.update({
-			"items":item_list
+			"valid_from":formatdate(pricing_doc.valid_from),
+			"valid_upto":formatdate(pricing_doc.valid_upto),
+			"min_qty":pricing_doc.min_qty
 		})
-	data["price_list"]=pricing_rule
+		
+		items = []
+		for item in pricing_doc.items:
+			if item.item_code in item_list:
+				items.append(item.item_code)
 
-	return data
+		j.update({
+			"items": items
+		})
+
+		if j.get("items"):
+			item_pricing_rules.append(j)
+
+	return item_pricing_rules
 
 @frappe.whitelist()
 def site_list(args):
@@ -565,11 +547,35 @@ def project_list():
 	return data
 
 @frappe.whitelist()
-def get_user_imgae():
+def get_user_details():
 	user = frappe.get_doc("User", frappe.session.user)
 	image = user.user_image or ""
+	customer = frappe.db.get_value("Customer", {"user": frappe.session.user}, "name") or ""
+	cus_address = frappe.db.get_value("Customer", {"user": frappe.session.user}, "customer_primary_address")
+	address = frappe._dict()
 
 	if image.startswith("/private") or image.startswith('/public') or image.startswith('/files'):
 		image = f"{frappe.utils.get_url()}{image}"
+	if customer:
+		info = get_dashboard_info("Customer",customer)
+		total = 0
+		for i in info:
+			total += (i.get("total_unpaid") or 0)
+			
+		if cus_address: 
+			address = frappe.get_doc("Address", cus_address)
 
-	return image
+	return {
+			'image': image,
+			'customer': customer,
+			'mobile': user.mobile_no,
+			'userid': user.full_name,
+			"address": address.address_line1 or "",
+			"city":address.city or "",
+			"gstin":address.gstin or "",
+			"unpaid":total or 0.0,
+			"pincode":address.pincode or "",
+			'email': user.name
+		}
+
+		

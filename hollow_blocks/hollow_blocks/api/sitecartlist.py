@@ -20,7 +20,7 @@ def getsitecartlist(project=None, allsites=False):
         filters = {"docstatus": 0, "customer": customer, 'project': ['is', 'set']}
         if project:
             filters['project'] = project
-        solist = frappe.db.get_list("Sales Order", filters=filters, fields=["name", "project"])
+        solist = frappe.db.get_list("Quotation", filters=filters, fields=["name", "project"])
         if not project:
             filters = {'customer': customer}
             if not allsites:
@@ -48,26 +48,27 @@ def getsitecartlist(project=None, allsites=False):
             }
             if name.get('name'):
                 cart_items = frappe.get_all(
-                    "Sales Order Item",
+                    "Quotation Item",
                     filters={
                         'parent': name['name'],
-                        'parenttype': 'Sales Order',
+                        'parenttype': 'Quotation',
                     },
                     fields=[
                         "item_code", 
                         "cast(ifnull(sum(qty), 0) as int) as qty",
                         "avg(rate) as rate",
                         "sum(amount) as amount",
-                        "'$' as currency"
+                        "'₹' as currency"
                         ],
-                    group_by = "item_code"
+                    group_by = "item_code",
+                    order_by = "idx"
                 )
                 for item in cart_items:
                     item.update({
                         'image': get_item_image_attachments(item['item_code'], item_attachments)
                     })
                 checkout_page_details = []
-                so_details = frappe.db.get_all("Sales Order", 
+                so_details = frappe.db.get_all("Quotation", 
                                         {'name': name['name']},
                                         [
                                             'cast(ifnull(total_qty, 0) as int) as total_qty', 
@@ -104,7 +105,7 @@ def getsitecartlist(project=None, allsites=False):
                 
 @frappe.whitelist()
 def updateCartItems(sales_order, items):
-    sales_order = frappe.get_doc("Sales Order", sales_order)
+    sales_order = frappe.get_doc("Quotation", sales_order)
     items = (json.loads(items) if(isinstance(items, str)) else items)
     for i in items:
         if 'image' in i:
@@ -127,7 +128,7 @@ def updateCartItems(sales_order, items):
 @frappe.whitelist()
 def submitCartOrder(sales_order, delivery_date=None):
     try:
-        doc=frappe.get_doc("Sales Order", sales_order)
+        doc=frappe.get_doc("Quotation", sales_order)
         if delivery_date:
             doc.update({
                 "delivery_date": delivery_date
