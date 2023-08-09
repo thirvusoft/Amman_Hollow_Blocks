@@ -8,24 +8,24 @@ def addToCart(itemcode, sitewiseqty):
     for site in sitewiseqty:
         qty = flt(site.get('qty') or 0)
         so_filters = {'project': site.get('name'), 'docstatus': 0}
-        if site.get("sales_order") and frappe.db.exists("Sales Order", {
+        if site.get("sales_order") and frappe.db.exists("Quotation", {
             "name": site.get("sales_order")
         }):
             so_filters["name"] = site.get("sales_order")
             
-        so_list = frappe.get_all("Sales Order", so_filters)
+        so_list = frappe.get_all("Quotation", so_filters)
         if not so_list and not qty:
             continue
 
         if not so_list:
-            sales_order = frappe.new_doc("Sales Order")
+            sales_order = frappe.new_doc("Quotation")
             sales_order.delivery_date = frappe.utils.nowdate()
             sales_order.update({
                 'project': site.get('name'),
                 'customer': frappe.get_value('Customer', {'user': frappe.session.user}, 'name'),
             })
         else:
-            sales_order=frappe.get_doc("Sales Order", so_list[0].name)
+            sales_order=frappe.get_doc("Quotation", so_list[0].name)
         
         updated = False
         for item in sales_order.get('items') or []:

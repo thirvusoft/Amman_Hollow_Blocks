@@ -17,16 +17,19 @@ def getsitecartlist(project=None, allsites=False):
     sitelist = []
     if customer:
         item_attachments = {}
-        filters = {"docstatus": 0, "customer": customer, 'project': ['is', 'set']}
+        filters = {"docstatus": 0, "party_name": customer, 'project': ['is', 'set']}
         if project:
             filters['project'] = project
+        
         solist = frappe.db.get_list("Quotation", filters=filters, fields=["name", "project"])
+        
         if not project:
             filters = {'customer': customer}
             if not allsites:
                 filters['status'] = ['not in', ['Completed', 'Cancelled']]
 
             projects = frappe.db.get_list("Project", filters, pluck="name")
+            
             so_projects = [i.project for i in solist]
             for pr in projects:
                 if pr not in so_projects:
@@ -36,6 +39,7 @@ def getsitecartlist(project=None, allsites=False):
                     })
 
         for name in solist:
+            
             sitedetails={
                 "name": name['project'],
                 "status": frappe.db.get_value("Project", name["project"], "status"),
@@ -100,7 +104,7 @@ def getsitecartlist(project=None, allsites=False):
                 sitedetails['checkout_page_details'] = checkout_page_details
             
             sitelist.append(sitedetails)
-        
+        # return sitedetails['sales_order']
         return sitelist
                 
 @frappe.whitelist()
@@ -128,7 +132,7 @@ def updateCartItems(sales_order, items):
 @frappe.whitelist()
 def submitCartOrder(sales_order, delivery_date=None):
     try:
-        doc=frappe.get_doc("Quotation", sales_order)
+        doc=frappe.get_doc("Sales Order", sales_order)
         if delivery_date:
             doc.update({
                 "delivery_date": delivery_date

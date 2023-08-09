@@ -317,6 +317,10 @@ def pricing_rule():
 			if getdate(pricing_doc.valid_upto) < getdate(frappe.utils.nowdate()):
 				continue
 
+		if pricing_doc.valid_from:
+			if getdate(pricing_doc.valid_from) > getdate(frappe.utils.nowdate()):
+				continue
+
 		j.update({
 			"name":pricing_doc.title,
 			"display":pricing_doc.title,
@@ -431,6 +435,8 @@ def site_creation(args):
 			return
 
 		project_doc.customer=customer
+		project_doc.latitude = args.get('latitude') or ''
+		project_doc.longitude = args.get('longitude') or ''
 		project_doc.save(ignore_permissions = True)
 		address = frappe.new_doc("Address")
 		address.address_title = args.get("sitename")
@@ -442,6 +448,10 @@ def site_creation(args):
 		address.append('links', {
 					"link_doctype": "Project",
 					"link_name": project_doc.name
+					})
+		address.append('links', {
+					"link_doctype": "Customer",
+					"link_name": customer
 					})
 		address.save(ignore_permissions = True)
 		project_doc.address=address.name

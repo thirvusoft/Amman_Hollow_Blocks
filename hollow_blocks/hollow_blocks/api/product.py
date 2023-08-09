@@ -38,21 +38,90 @@ def get_item_list():
         pr_item.item_code,
         pr.name as offer_id,
         pr.title as name,
-        CASE
-            WHEN pr.rate_or_discount = "Discount Percentage"
-                THEN pr.discount_percentage
-            ELSE
-                pr.discount_amount
-        END as offer,
+        CONCAT(
+            pr.title,
+            CASE
+                WHEN pr.rate_or_discount = "Discount Percentage"
+                    THEN CONCAT(' - ', ROUND(pr.discount_percentage, 2), ' Percent\n')
+                ELSE
+                    CONCAT(' - ', ROUND(pr.discount_amount, 2), ' Amount\n')
+            END,
+            CASE
+                WHEN (IFNULL(pr.valid_from, '') != '') OR (IFNULL(pr.valid_upto, '') != '')
+                    THEN CONCAT(
+                        CASE
+                            WHEN IFNULL(pr.valid_from, '') != ''
+                                THEN CONCAT("Valid From: ", pr.valid_from, " ")
+                            ELSE 
+                                ''
+                        END,
+                        CASE
+                            WHEN IFNULL(pr.valid_upto, '') != ''
+                                THEN CONCAT("Valid Upto: ", pr.valid_upto, " ")
+                            ELSE 
+                                ''
+                        END,
+                        '\n'
+                    )
+                ELSE
+                    ''
+            END,
+            CASE
+                WHEN (IFNULL(pr.min_qty, 0) > 0) OR (IFNULL(pr.max_qty, 0) > 0)
+                    THEN CONCAT(
+                        CASE
+                            WHEN IFNULL(pr.min_qty, 0) > 0
+                                THEN CONCAT("Min Qty: ", ROUND(pr.min_qty, 2), " ")
+                            ELSE 
+                                ''
+                        END,
+                        CASE
+                            WHEN IFNULL(pr.max_qty, 0)
+                                THEN CONCAT("Max Qty: ", ROUND(pr.max_qty, 2))
+                            ELSE 
+                                ''
+                        END,
+                        '\n'
+                    )
+                ELSE
+                    ''
+            END,
+            CASE
+                WHEN (IFNULL(pr.min_amt, 0) > 0) OR (IFNULL(pr.max_amt, 0) > 0)
+                    THEN CONCAT(
+                        CASE
+                            WHEN IFNULL(pr.min_amt, 0) > 0
+                                THEN CONCAT("Min Amt: ", ROUND(pr.min_amt, 2), " ")
+                            ELSE 
+                                ''
+                        END,
+                        CASE
+                            WHEN IFNULL(pr.max_amt, 0)
+                                THEN CONCAT("Max Amt: ", ROUND(pr.max_amt, 2))
+                            ELSE 
+                                ''
+                        END,
+                        '\n'
+                    )
+                ELSE
+                    ''
+            END
+        ) as offer,
         pr.valid_from,
         pr.valid_upto
-        FROM `tabPricing Rule` pr
+    FROM `tabPricing Rule` pr
     INNER JOIN `tabPricing Rule Item Code` pr_item
     ON  pr.name = pr_item.parent AND pr_item.parenttype = 'Pricing Rule'
     WHERE
         CASE
             WHEN IFNULL(pr.valid_upto, '') != ''
                 THEN pr.valid_upto >= "{frappe.utils.nowdate()}"
+            ELSE
+                1=1
+        END AND
+        CASE
+            WHEN IFNULL(pr.valid_from, '') != ''
+                THEN pr.valid_from <= "{frappe.utils.nowdate()}"
             ELSE
                 1=1
         END AND
@@ -67,11 +136,13 @@ def get_item_list():
             item_wise_offers[row.item_code] = {
                 'offer_id': [], 
                 'pricing_rules': [],
-                'offer': []
+                'offer': [],
+                'offer_display': []
                 }
         item_wise_offers[row.item_code]['offer_id'].append(row.get('offer_id') or '')
         item_wise_offers[row.item_code]['pricing_rules'].append(row)
-        item_wise_offers[row.item_code]['offer'].append(row.get('offer') or '')
+        item_wise_offers[row.item_code]['offer_display'].append(row.get("name") or "")
+        item_wise_offers[row.item_code]['offer'].append(row.get("offer") or "")
 
     item_list=frappe.db.get_list("Item",filters={
         "disabled": 0,
@@ -92,6 +163,7 @@ def get_item_list():
             "currency": "₹",
             "favourite": f'"{frappe.session.user}"' in (frappe.db.get_value("Item", item.name, "_liked_by") or ""),
             "offer": (item_wise_offers.get(item.item_code) or {}).get('offer') or [],
+            "offer_display": ", ".join((item_wise_offers.get(item.item_code) or {}).get('offer_display') or []),
             "price_list_rate": item_price[0][1] if item_price else 0.0, 
             "image": get_item_image_attachments(item['item_code'], {}),
             "pricing_rules": (item_wise_offers.get(item.item_code) or {}).get('pricing_rules') or [],
