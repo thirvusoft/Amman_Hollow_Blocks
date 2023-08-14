@@ -19,7 +19,6 @@ def addToCart(itemcode, sitewiseqty):
 
         if not so_list:
             quotation = frappe.new_doc("Quotation")
-            quotation.delivery_date = frappe.utils.nowdate()
             quotation.update({
                 'quotation_to': 'Customer',
                 'project': site.get('name'),

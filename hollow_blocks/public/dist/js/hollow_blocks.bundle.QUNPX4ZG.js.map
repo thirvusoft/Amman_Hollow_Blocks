@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["frappe-html:/home/frappe/frappe-bench/apps/hollow_blocks/hollow_blocks/public/html/transaction_history.html"],
-  "sourcesContent": ["\n\tfrappe.templates['transaction_history'] = `\n\n   \n<table class=\"tab1\">\n   \n\t<thead>\n\t\t<tr>\n            <th style=\"width: 06%\">{%= __(\"S.No\") %}</th>\n\t\t\t<th style=\"width: 06%\">{%= __(\"Item\") %}</th>\n\t\t\t<th style=\"width: 12%\">{%= __(\"Rate\") %}</th>\n            <span class=\"close-x\" onclick=\"cur_frm.fields_dict.transaction.html(); return false;\">x</span>\n\t\t\t\n\t\t</tr>\n\t</thead>\n    <tbody>\n\t\t{% for(var i=0, l=outstanding_amount.length; i<l; i++) { %}\n\t\t\t<tr>\n\t\t\t\n\t\t\t\t<td>{%= i+1 %}</td>\n\t\t\t\t<td>{%= outstanding_amount[i][\"item_name\"] %}</td>\n                <td>{%= outstanding_amount[i][\"rate\"] %}</td>\n\t\t\t\t\n\t\t\t\t\n           \n\t\t\t</tr>\n\t\t{% } %}\n\t</tbody>\n</table>\n\n`;\n"],
-  "mappings": ";;AACC,SAAO,UAAU,yBAAyB;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;",
-  "names": []
-}

@@ -5,6 +5,7 @@ from frappe.utils import formatdate
 from erpnext.accounts.party import get_dashboard_info
 from frappe.utils.data import getdate
 from hollow_blocks.hollow_blocks.api.sitecartlist import getsitecartlist
+from frappe.desk.form.linked_with import get_submitted_linked_docs
 
 @frappe.whitelist()
 def transactions(args):
@@ -29,7 +30,7 @@ def transactions(args):
 	
 	# SALES ORDER
 	so_list = frappe.db.get_all('Sales Order',filters=filters, fields = [
-		"name", "status", "delivery_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total", "project"
+		"name", "status", "delivery_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total", "project", "sales_order_approved"
 	])
 	for so in so_list:		
 		item_list = frappe.get_all("Sales Order Item", filters = {
@@ -39,19 +40,21 @@ def transactions(args):
 			"item_code",
 			"item_name",
 			"qty",
+			"rate",
 			"amount",
 			"uom",
 			"conversion_factor",
 		])
-		
+		links = get_submitted_linked_docs(doctype="Sales Order", name=so.get("name"))
 		so.update({
+			"is_approved": (so.get("sales_order_approved") or 0) or links.get("count"),
 			"project_name": frappe.db.get_value("Project", so.get("project"), "project_name") if so.get("project") else "",
 			"items":item_list
 		})
 
 	# SALES INVOICE
 	sales_inv_list = frappe.db.get_all('Sales Invoice',filters=filters, fields = [
-		"name", "status", "posting_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total", "project"
+		"name", "status", "posting_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total", "project", "outstanding_amount"
 	])
 	for si in sales_inv_list:
 		item_list = frappe.get_all("Sales Invoice Item", filters = {
@@ -61,6 +64,7 @@ def transactions(args):
 			"item_code as item",
 			"item_name",
 			"qty",
+			"rate",
 			"amount",
 			"uom",
 			"conversion_factor",
@@ -68,7 +72,17 @@ def transactions(args):
 
 		si.update({
 			"project_name": frappe.db.get_value("Project", si.get("project"), "project_name") if si.get("project") else "",
-			"items":item_list
+			"items": item_list,
+			"other_details": [
+				{
+					"label": "Paid Amount",
+					"value": (si.get("grand_total") or 0) - (si.get("outstanding_amount") or 0)
+				},
+				{
+					"label": "Outstanding Amount",
+					"value": (si.get("outstanding_amount") or 0)
+				}
+			]
 		})
 	
 	# DELIVERY NOTE
@@ -83,6 +97,7 @@ def transactions(args):
 			"item_code as item",
 			"item_name",
 			"qty",
+			"rate",
 			"amount",
 			"uom",
 			"conversion_factor",
@@ -108,7 +123,7 @@ def transactions(args):
 			"parent": pe.name
 		}, fields = [
 			"reference_name as doctype",
-			"amount as total_amount"
+			"allocated_amount as total_amount"
 		])
 		pe.update({
 			"project_name": frappe.db.get_value("Project", pe.get("project"), "project_name") if pe.get("project") else "",
@@ -465,26 +480,24 @@ def duplicateSalesOrder(sales_order="", delivery_date=None):
 	
 	if not frappe.db.exists("Sales Order", sales_order):
 		frappe.local.response["show_alert"] = {
-			"message": "Couldn't create sales order",
+			"message": "Couldn't duplicate sales order",
 			"indicator": "red"
 		}
 		return
 
 	so_doc = frappe.get_doc("Sales Order", sales_order)
-	doc = frappe.copy_doc(so_doc)
-	doc.delivery_date = delivery_date
-	if frappe.db.exists("Sales Order", {
+	if frappe.db.exists("Quotation", {
 		"docstatus": 0,
 		"project": so_doc.project
 	}):
-		sales_order = frappe.get_doc("Sales Order", {
+		quotation = frappe.get_doc("Quotation", {
 			"docstatus": 0,
 			"project": so_doc.project
 		})
-		items = sales_order.get("items") or []
+		items = quotation.get("items") or []
 		append_items = []
 		added_item = []
-		for row in (doc.get("items") or []):
+		for row in (so_doc.get("items") or []):
 			add = False
 			for i_row in items:
 				if i_row.item_code == row.item_code and row.item_code not in added_item:
@@ -494,20 +507,36 @@ def duplicateSalesOrder(sales_order="", delivery_date=None):
 					continue
 			
 			if not add:
-				append_items.append(row)
+				append_items.append({
+					"item_code": row.item_code,
+					"qty": row.qty,
+				})
 		
 		items += append_items
 
-		sales_order.update({
+		quotation.update({
 			"items": items
 		})
-		sales_order.save()
+		quotation.save()
 
 	else:
-		doc.save()
+		quotation = frappe.new_doc("Quotation")
+		quotation.update({
+			'quotation_to': 'Customer',
+			'project': so_doc.project,
+			'party_name': frappe.get_value('Customer', {'user': frappe.session.user}, 'name'),
+			"items": [
+				{
+					"item_code": row.item_code,
+					"qty": row.qty,
+				}
+				for row in so_doc.items
+			]
+		})
+		quotation.save()
 
 	frappe.local.response["show_alert"] = {
-			"message": "New Order added in cart. Please find and checkout the items in cart to create sales order",
+			"message": "New Items added in cart. Please find and checkout the items in cart to create order",
 			"indicator": "green",
 			"long_msg": True
 		}

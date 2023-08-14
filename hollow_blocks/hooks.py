@@ -109,13 +109,11 @@ doctype_js = {"Lead" : "hollow_blocks/custom/js/lead.js",
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-#	"*": {
-#		"on_update": "method",
-#		"on_cancel": "method",
-#		"on_trash": "method"
-#	}
-# }
+doc_events = {
+	"Sales Order": {
+		"on_cancel": "hollow_blocks.hollow_blocks.custom.py.sales_order.validate_cancel",
+	}
+}
 
 # Scheduled Tasks
 # ---------------
