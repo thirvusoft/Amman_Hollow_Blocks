@@ -21,7 +21,7 @@ def getsitecartlist(project=None, allsites=False):
         if project:
             filters['project'] = project
         
-        solist = frappe.db.get_list("Quotation", filters=filters, fields=["name", "project"])
+        quotation_list = frappe.db.get_list("Quotation", filters=filters, fields=["name", "project"])
         
         if not project:
             filters = {'customer': customer}
@@ -30,15 +30,15 @@ def getsitecartlist(project=None, allsites=False):
 
             projects = frappe.db.get_list("Project", filters, pluck="name")
             
-            so_projects = [i.project for i in solist]
+            so_projects = [i.project for i in quotation_list]
             for pr in projects:
                 if pr not in so_projects:
-                    solist.append({
+                    quotation_list.append({
                         'name': '',
                         'project': pr
                     })
 
-        for name in solist:
+        for name in quotation_list:
             
             sitedetails={
                 "name": name['project'],
@@ -47,7 +47,7 @@ def getsitecartlist(project=None, allsites=False):
                 "qty": 0,
                 "amount": 0,
                 'cart_items': [],
-                'sales_order': '',
+                'quotation': '',
                 'checkout_page_details': []
             }
             if name.get('name'):
@@ -100,28 +100,28 @@ def getsitecartlist(project=None, allsites=False):
                                 "bold": 1 if field == 'grand_total' else 0
                             })
                 sitedetails['cart_items'] = cart_items
-                sitedetails['sales_order'] = name['name']
+                sitedetails['quotation'] = name['name']
                 sitedetails['checkout_page_details'] = checkout_page_details
             
             sitelist.append(sitedetails)
-        # return sitedetails['sales_order']
+
         return sitelist
                 
 @frappe.whitelist()
-def updateCartItems(sales_order, items):
-    sales_order = frappe.get_doc("Quotation", sales_order)
+def updateCartItems(quotation, items):
+    quotation = frappe.get_doc("Quotation", quotation)
     items = (json.loads(items) if(isinstance(items, str)) else items)
     for i in items:
         if 'image' in i:
             del i['image']
-    sales_order.update({
+    quotation.update({
         "items": [item for item in items if flt(item.get('qty'))]
     })
-    if not sales_order.items:
-        sales_order.delete()
+    if not quotation.items:
+        quotation.delete()
         frappe.local.response['delete'] = True
     else:
-        sales_order.save()
+        quotation.save()
     frappe.db.commit()
     frappe.local.response["show_alert"] = {
         'message': 'Cart Updated!', 
@@ -130,9 +130,9 @@ def updateCartItems(sales_order, items):
     return getsitecartlist()
 
 @frappe.whitelist()
-def submitCartOrder(sales_order, delivery_date=None):
+def submitCartOrder(quotation, delivery_date=None):
     try:
-        doc=frappe.get_doc("Sales Order", sales_order)
+        doc=frappe.get_doc("Quotation", quotation)
         if delivery_date:
             doc.update({
                 "delivery_date": delivery_date
@@ -148,7 +148,7 @@ def submitCartOrder(sales_order, delivery_date=None):
         }
         return getsitecartlist()
     except:
-        frappe.log_error(title=f"API - delivery_date  {sales_order}  {delivery_date}", message=frappe.get_traceback())
+        frappe.log_error(title=f"API - delivery_date  {quotation}  {delivery_date}", message=frappe.get_traceback())
         frappe.local.response['show_alert'] = {
             "message": "OOPS! Something went wrong.",
             "indicator": "red"

@@ -1,8 +1,7 @@
 import frappe, erpnext
-from json import loads
 import json
 import re
-from frappe.utils import today, formatdate
+from frappe.utils import formatdate
 from erpnext.accounts.party import get_dashboard_info
 from frappe.utils.data import getdate
 from hollow_blocks.hollow_blocks.api.sitecartlist import getsitecartlist
@@ -10,7 +9,7 @@ from hollow_blocks.hollow_blocks.api.sitecartlist import getsitecartlist
 @frappe.whitelist()
 def transactions(args):
 	if isinstance(args, str):
-		args = josn.loads(args)
+		args = json.loads(args)
 
 	data={}
 
@@ -171,18 +170,12 @@ def status_list():
 def login(args):
 	if isinstance(args, str):
 		args=json.loads(args)
-	try:
-		login_manager = frappe.auth.LoginManager()
-		login_manager.authenticate(user=args["username"], pwd=args["password"])
-		login_manager.post_login()
-	except frappe.exceptions.AuthenticationError:
-		frappe.clear_messages()
-		frappe.local.response["message"] = {
-			"message":"Incorrect Username or Password"
-		}
-		return "Failed"
-	
+
+	login_manager = frappe.auth.LoginManager()
+	login_manager.authenticate(user=args["username"], pwd=args["password"])
+	login_manager.post_login()
 	frappe.db.commit()
+	
 	cust = frappe.db.get_value("Customer", {"user": frappe.session.user}, "name")
 	if cust:
 		frappe.response["message"] = {
@@ -379,32 +372,6 @@ def site_list(args):
 	data["site_list"]=site_list
 
 	return data
-	
-@frappe.whitelist()
-def sitelit_with_orderitems():
-	data={}
-	site_list=frappe.get_all("Project",{"customer":"testing"})
-	for k in site_list:
-		salesdoc_list=frappe.get_all("Sales Order",{"project":k['name']})
-		for j in salesdoc_list:
-			salesord_doc = frappe.get_doc('Sales Order',j['name'])
-			
-			item_list = []
-			for item in salesord_doc.items:
-				item_details = frappe._dict()
-				item_details.update({
-					"item":item.item_code,
-					"qty":item.qty,
-					"image":f"""{"http://"+frappe.local.request.host+item.image}"""
-					
-				})
-				item_list.append(item_details)
-				j.update({
-					"cart_items":item_list
-				})
-	data["site_list"]=salesdoc_list
-	return data
-
 
 
 @frappe.whitelist()
@@ -439,6 +406,7 @@ def site_creation(args):
 		project_doc.longitude = args.get('longitude') or ''
 		project_doc.save(ignore_permissions = True)
 		address = frappe.new_doc("Address")
+		address.address_type = "Shipping"
 		address.address_title = args.get("sitename")
 		address.address_line1 = args.get("siteaddress")
 		address.city = args.get("sitecity")

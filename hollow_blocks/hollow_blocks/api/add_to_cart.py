@@ -8,48 +8,49 @@ def addToCart(itemcode, sitewiseqty):
     for site in sitewiseqty:
         qty = flt(site.get('qty') or 0)
         so_filters = {'project': site.get('name'), 'docstatus': 0}
-        if site.get("sales_order") and frappe.db.exists("Quotation", {
-            "name": site.get("sales_order")
+        if site.get("quotation") and frappe.db.exists("Quotation", {
+            "name": site.get("quotation")
         }):
-            so_filters["name"] = site.get("sales_order")
+            so_filters["name"] = site.get("quotation")
             
         so_list = frappe.get_all("Quotation", so_filters)
         if not so_list and not qty:
             continue
 
         if not so_list:
-            sales_order = frappe.new_doc("Quotation")
-            sales_order.delivery_date = frappe.utils.nowdate()
-            sales_order.update({
+            quotation = frappe.new_doc("Quotation")
+            quotation.delivery_date = frappe.utils.nowdate()
+            quotation.update({
+                'quotation_to': 'Customer',
                 'project': site.get('name'),
-                'customer': frappe.get_value('Customer', {'user': frappe.session.user}, 'name'),
+                'party_name': frappe.get_value('Customer', {'user': frappe.session.user}, 'name'),
             })
         else:
-            sales_order=frappe.get_doc("Quotation", so_list[0].name)
+            quotation=frappe.get_doc("Quotation", so_list[0].name)
         
         updated = False
-        for item in sales_order.get('items') or []:
+        for item in quotation.get('items') or []:
             if item.item_code == itemcode:
                 item.qty = qty
                 updated = True
                 break
         
         if not updated:
-            sales_order.update({
-                "items": (sales_order.get('items') or []) + [{'item_code': itemcode, 'qty': qty}]
+            quotation.update({
+                "items": (quotation.get('items') or []) + [{'item_code': itemcode, 'qty': qty}]
             })
             updated = True
         
-        sales_order.update({
-            "items": [item for item in sales_order.items if item.get('qty')] 
+        quotation.update({
+            "items": [item for item in quotation.items if item.get('qty')] 
         })
 
-        frappe.local.response['sales_order'] = sales_order.name
-        if not sales_order.items:
-            sales_order.delete()
+        frappe.local.response['quotation'] = quotation.name
+        if not quotation.items:
+            quotation.delete()
             frappe.local.response['delete'] = True
         else:
-            items = sales_order.items
+            items = quotation.items
             update_items = []
             count = 0
             for row in items or []:
@@ -61,10 +62,10 @@ def addToCart(itemcode, sitewiseqty):
                 else:
                     update_items.append(row)
             
-            sales_order.update({
+            quotation.update({
                 "items": update_items
             })
-            sales_order.save()
+            quotation.save()
 
         frappe.db.commit()
     
