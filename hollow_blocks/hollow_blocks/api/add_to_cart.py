@@ -7,6 +7,7 @@ def addToCart(itemcode, sitewiseqty):
     sitewiseqty = (json.loads(sitewiseqty) if(isinstance(sitewiseqty, str)) else sitewiseqty)
     for site in sitewiseqty:
         qty = flt(site.get('qty') or 0)
+        
         so_filters = {'project': site.get('name'), 'docstatus': 0}
         if site.get("quotation") and frappe.db.exists("Quotation", {
             "name": site.get("quotation")
@@ -16,9 +17,10 @@ def addToCart(itemcode, sitewiseqty):
         so_list = frappe.get_all("Quotation", so_filters)
         if not so_list and not qty:
             continue
-
+        
         if not so_list:
             quotation = frappe.new_doc("Quotation")
+            quotation.delivery_date = frappe.utils.nowdate()
             quotation.update({
                 'quotation_to': 'Customer',
                 'project': site.get('name'),
@@ -43,7 +45,7 @@ def addToCart(itemcode, sitewiseqty):
         quotation.update({
             "items": [item for item in quotation.items if item.get('qty')] 
         })
-
+       
         frappe.local.response['quotation'] = quotation.name
         if not quotation.items:
             quotation.delete()

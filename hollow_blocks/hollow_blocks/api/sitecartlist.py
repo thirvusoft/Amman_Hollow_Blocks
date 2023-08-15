@@ -1,7 +1,7 @@
 import frappe
 import json
 from frappe.utils import flt
-from erpnext.selling.doctype.quotation.quotation import make_sales_order
+from erpnext.stock.get_item_details import get_item_details
 
 def get_item_image_attachments(item_code, item_attachments):
     if item_code not in item_attachments:
@@ -133,15 +133,32 @@ def updateCartItems(quotation, items):
 def submitCartOrder(quotation, delivery_date=None):
     try:
         doc=frappe.get_doc("Quotation", quotation)
+        sales_doc=frappe.new_doc("Sales Order")
+       
+        if delivery_date:
+            doc.update({
+                "delivery_date": delivery_date
+            })
+            for item in doc.items:
+                item.delivery_date = delivery_date
+
         doc.save()
         doc.submit()
-        sales_order = make_sales_order(doc.name)
-        sales_order.update({
-            "delivery_date": delivery_date or frappe.utils.nowdate()
-        })
-        sales_order.save()
-        sales_order.submit()
-
+        
+        sales_doc.customer=doc.party_name
+        sales_doc.transaction_date=doc.transaction_date
+        sales_doc.delivery_date =doc.delivery_date
+        for item in doc.items:
+            sales_doc.append(
+                "items",{
+                    "item_code":item.item_code,
+                    "qty":item.qty,
+                    "rate":item.rate,
+                    "delivery_date":doc.delivery_date
+                }
+            )
+        sales_doc.save()
+       
         frappe.local.response['show_alert'] = {
             "message": "Order Placed!",
             "indicator": "green"
