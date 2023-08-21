@@ -158,6 +158,7 @@ def submitCartOrder(quotation, delivery_date=None):
                 }
             )
         sales_doc.save()
+        sales_doc.submit()
        
         frappe.local.response['show_alert'] = {
             "message": "Order Placed!",

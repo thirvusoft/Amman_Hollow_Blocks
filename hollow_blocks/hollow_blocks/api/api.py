@@ -7,6 +7,14 @@ from frappe.utils.data import getdate
 from hollow_blocks.hollow_blocks.api.sitecartlist import getsitecartlist
 from frappe.desk.form.linked_with import get_submitted_linked_docs
 
+
+"""
+	core changes for api
+	password_reset.html
+	app.py
+	user.py
+"""
+
 @frappe.whitelist()
 def transactions(args):
 	if isinstance(args, str):
@@ -185,11 +193,13 @@ def status_list():
 def login(args):
 	if isinstance(args, str):
 		args=json.loads(args)
-
+		
+	frappe.flags.mobile_login = True
 	login_manager = frappe.auth.LoginManager()
 	login_manager.authenticate(user=args["username"], pwd=args["password"])
 	login_manager.post_login()
 	frappe.db.commit()
+	frappe.flags.mobile_login = False
 	
 	cust = frappe.db.get_value("Customer", {"user": frappe.session.user}, "name")
 	if cust:
@@ -236,6 +246,7 @@ def signup(args):
 
 	
 	user.email = args["email"]
+	user.is_mobile_app_user = True
 	user.first_name = args["name"]
 	user.send_welcome_email = 0
 	user.user_type = 'System User'

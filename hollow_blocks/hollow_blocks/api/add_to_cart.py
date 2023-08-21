@@ -68,8 +68,8 @@ def addToCart(itemcode, sitewiseqty):
             })
             quotation.save()
 
-        frappe.db.commit()
-    
+    frappe.db.commit()
+
     frappe.local.response['show_alert'] = {
         'message': 'Cart Updated!',
         'indicator': 'green'

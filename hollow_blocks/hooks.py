@@ -108,7 +108,7 @@ doctype_js = {"Lead" : "hollow_blocks/custom/js/lead.js",
 # Document Events
 # ---------------
 # Hook on document methods and events
-
+after_migrate = "hollow_blocks.hollow_blocks.custom.py.user.create_user_fields"
 doc_events = {
 	"Sales Order": {
 		"on_cancel": "hollow_blocks.hollow_blocks.custom.py.sales_order.validate_cancel",
