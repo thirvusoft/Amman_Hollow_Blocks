@@ -62,7 +62,7 @@ def transactions(args):
 
 	# SALES INVOICE
 	sales_inv_list = frappe.db.get_all('Sales Invoice',filters=filters, fields = [
-		"name", "status", "posting_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total", "project", "outstanding_amount"
+		"name", "status", "posting_date", "total_qty", "total as net_total", "total_taxes_and_charges as tax_amount", "grand_total", "project", "outstanding_amount", "rounded_total"
 	])
 	for si in sales_inv_list:
 		item_list = frappe.get_all("Sales Invoice Item", filters = {
@@ -84,7 +84,7 @@ def transactions(args):
 			"other_details": [
 				{
 					"label": "Paid Amount",
-					"value": (si.get("grand_total") or 0) - (si.get("outstanding_amount") or 0)
+					"value": (si.get("rounded_total") or 0) - (si.get("outstanding_amount") or 0)
 				},
 				{
 					"label": "Outstanding Amount",
@@ -126,16 +126,24 @@ def transactions(args):
 	])
 	
 	for pe in payment_entry:
-		item_list = frappe.get_all("Payment Entry Reference", filters = {
+		payment_reference = frappe.get_all("Payment Entry Reference", filters = {
 			"parenttype": "Payment Entry",
 			"parent": pe.name
 		}, fields = [
-			"reference_name as doctype",
+			"reference_doctype as doctype",
+			"reference_name as docname",
 			"allocated_amount as total_amount"
 		])
+		for ref in payment_reference:
+			ref.project = ''
+			ref.project_name = ''
+			if ref.reference_doctype in ("Sales Order", "Delivery Note", "Sales Invoice") and ref.reference_name:
+				ref.project = frappe.db.get_value(ref.reference_doctype, ref.reference_name, 'project') or ''
+				ref.project_name = frappe.db.get_value("Project", ref.get("project"), "project_name") if ref.get("project") else ""
+
 		pe.update({
 			"project_name": frappe.db.get_value("Project", pe.get("project"), "project_name") if pe.get("project") else "",
-			"items":item_list
+			"references": payment_reference
 		})
 
 	data["sales_order"]=so_list or []
@@ -214,7 +222,10 @@ def login(args):
 
 @frappe.whitelist(allow_guest=True)
 def signup(args):
-#    args=json.loads(args)
+	frappe.session.user = "Administrator"
+	if isinstance(args, str):
+		args=json.loads(args)
+
 	data = {"message":""}
 	user = frappe.new_doc("User")
 	if not args["name"]:
@@ -263,52 +274,29 @@ def signup(args):
 	customer.customer_type = "Individual"
 	customer.customer_group = "Individual"
 	customer.territory = "India"
+	customer.update({
+		"_email_id": args["email"],
+		"_mobile_no": args["mobile_no"],
+
+		"_gstin": args["gstin"],
+
+		**(
+			{"gst_category": "Registered Regular"} if args["gstin"] else {}
+		),
+		"_pincode":args["pincode"],
+		"address_line1": args["address"],
+		"address_line2": "",
+		"city": args["city"],
+		"state": args.get("state"),
+		"country": "India"
+	})
 	if args["gstin"]:
 		customer.gstin = args["gstin"]
 		customer.gst_category="Registered Regular"
 	customer.user = user.name
-	customer.save(ignore_permissions = True)
-
-	address = frappe.new_doc("Address")
-	address.address_title = args["name"]
-	address.address_line1 = args["address"]
-	address.city = args["city"]
-	address.state = args.get("state")
-	address.gst_state = args.get('state')
-	if args["gstin"]:
-		address.gstin = args["gstin"]
-		address.gst_category="Registered Regular"
-	# address.district = args["district"] or ""
-	address.pincode = args["pincode"]
-	address.append('links', {
-				"link_doctype": "Customer",
-				"link_name": customer.name
-				})
-	address.save(ignore_permissions = True)
-	contact = frappe.new_doc("Contact")
-	contact.first_name=args["name"]
-	contact.email_id=args["email"]
-	contact.user=args["email"]
-	contact.mobile_no=args["mobile_no"]
-	contact.append('email_ids',{
-		"email_id":args["email"],
-		"is_primary":1
-	})
-	contact.append('phone_nos',{
-		"phone":args["mobile_no"],
-		"is_primary_mobile_no":1
-
-	})
-	contact.append('links',{
-		"link_doctype": "Customer",
-		"link_name": customer.name
-
-	})
-	contact.save(ignore_permissions = True)
-	customer.customer_primary_address = address.name
-	customer.customer_primary_contact = contact.name
-	customer.save(ignore_permissions = True)
-
+	customer.save()
+	
+	frappe.session.user = "Guest"
 
 	data["message"] = "Account Created, Please Login"
 	return data
@@ -569,6 +557,7 @@ def get_user_details():
 	user = frappe.get_doc("User", frappe.session.user)
 	image = user.user_image or ""
 	customer = frappe.db.get_value("Customer", {"user": frappe.session.user}, "name") or ""
+	customer_name = frappe.db.get_value("Customer", {"user": frappe.session.user}, "customer_name") or ""
 	cus_address = frappe.db.get_value("Customer", {"user": frappe.session.user}, "customer_primary_address")
 	address = frappe._dict()
 
@@ -585,9 +574,9 @@ def get_user_details():
 
 	return {
 			'image': image,
-			'customer': customer,
+			'customer': customer_name,
 			'mobile': user.mobile_no,
-			'userid': user.full_name,
+			'userid': user.name,
 			"address": address.address_line1 or "",
 			"city":address.city or "",
 			"gstin":address.gstin or "",

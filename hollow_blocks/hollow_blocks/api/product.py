@@ -150,10 +150,23 @@ def get_item_list():
         "item_group": ["not in", frappe.db.get_list("Item Group", {"dont_show_in_mobile_app": 1}, pluck="name")]
         },fields=["name as item_code", "description", "stock_uom as uom", "item_group", "name"])
     
+    selling_price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list")
+
     for item in item_list:	
         item_price = get_item_price(
             args= {
+                'price_list': selling_price_list,
                 'customer': frappe.db.get_value('Customer', {'user': frappe.session.user}, 'name'),
+                'uom': item.uom,
+                'transaction_date': frappe.utils.nowdate()
+            },
+            item_code = item.name
+        )
+        if not item_price:
+            get_item_price(
+            args= {
+                'customer': frappe.db.get_value('Customer', {'user': frappe.session.user}, 'name'),
+                'uom': item.uom,
                 'transaction_date': frappe.utils.nowdate()
             },
             item_code = item.name

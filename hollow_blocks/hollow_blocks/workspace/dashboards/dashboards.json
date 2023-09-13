@@ -1,0 +1,56 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"nBWxFnMLSD\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Dashboards</span>\",\"col\":12}},{\"id\":\"80LjkhLtZq\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Accounts\",\"col\":3}},{\"id\":\"IM1ZSSR0Ua\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Stock\",\"col\":3}},{\"id\":\"i9TJ4MZpT9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Selling\",\"col\":3}},{\"id\":\"euGrdrde8a\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Buying\",\"col\":3}}]",
+ "creation": "2023-09-01 17:12:38.388629",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "Dashboards",
+ "links": [],
+ "modified": "2023-09-01 17:18:29.802340",
+ "modified_by": "Administrator",
+ "module": "Hollow Blocks",
+ "name": "Dashboards",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 46.0,
+ "shortcuts": [
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Stock",
+   "link_to": "Stock",
+   "type": "Dashboard"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Selling",
+   "link_to": "Selling",
+   "type": "Dashboard"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Accounts",
+   "link_to": "Accounts",
+   "type": "Dashboard"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Buying",
+   "link_to": "Buying",
+   "type": "Dashboard"
+  }
+ ],
+ "title": "Dashboards"
+}

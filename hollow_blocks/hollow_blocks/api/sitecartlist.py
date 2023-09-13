@@ -1,8 +1,7 @@
 import frappe
 import json
 from frappe.utils import flt
-from erpnext.stock.get_item_details import get_item_details
-
+from erpnext.selling.doctype.quotation.quotation import make_sales_order
 def get_item_image_attachments(item_code, item_attachments):
     if item_code not in item_attachments:
         attachments = frappe.db.get_all('File', filters={'attached_to_name': item_code, 'attached_to_doctype': 'Item', 'attached_to_field': "image"}, fields=['file_url'], order_by='creation desc')
@@ -59,7 +58,7 @@ def getsitecartlist(project=None, allsites=False):
                     },
                     fields=[
                         "item_code", 
-                        "cast(ifnull(sum(qty), 0) as int) as qty",
+                        "round(ifnull(sum(qty), 0), 2) as qty",
                         "avg(rate) as rate",
                         "sum(amount) as amount",
                         "'₹' as currency"
@@ -75,7 +74,7 @@ def getsitecartlist(project=None, allsites=False):
                 so_details = frappe.db.get_all("Quotation", 
                                         {'name': name['name']},
                                         [
-                                            'cast(ifnull(total_qty, 0) as int) as total_qty', 
+                                            'round(ifnull(total_qty, 0), 2) as total_qty', 
                                             'total', 
                                             'total_taxes_and_charges',
                                             'grand_total',
@@ -133,32 +132,30 @@ def updateCartItems(quotation, items):
 def submitCartOrder(quotation, delivery_date=None):
     try:
         doc=frappe.get_doc("Quotation", quotation)
-        sales_doc=frappe.new_doc("Sales Order")
-       
-        if delivery_date:
-            doc.update({
-                "delivery_date": delivery_date
-            })
-            for item in doc.items:
-                item.delivery_date = delivery_date
-
-        doc.save()
         doc.submit()
+
+
+        sales_order = make_sales_order(source_name=doc.name)
+        sales_order.delivery_date =delivery_date
+        sales_order.save()
+        sales_order.submit()
         
-        sales_doc.customer=doc.party_name
-        sales_doc.transaction_date=doc.transaction_date
-        sales_doc.delivery_date =doc.delivery_date
-        for item in doc.items:
-            sales_doc.append(
-                "items",{
-                    "item_code":item.item_code,
-                    "qty":item.qty,
-                    "rate":item.rate,
-                    "delivery_date":doc.delivery_date
-                }
-            )
-        sales_doc.save()
-        sales_doc.submit()
+        # sales_doc=frappe.new_doc("Sales Order")
+        # sales_doc.customer=doc.party_name
+        # sales_doc.transaction_date=doc.transaction_date
+        # sales_doc.delivery_date =doc.delivery_date
+        # sales_doc.project =doc.project
+        # for item in doc.items:
+        #     sales_doc.append(
+        #         "items",{
+        #             "item_code":item.item_code,
+        #             "qty":item.qty,
+        #             "rate":item.rate,
+        #             "delivery_date":doc.delivery_date
+        #         }
+        #     )
+        # sales_doc.save()
+        # sales_doc.submit()
        
         frappe.local.response['show_alert'] = {
             "message": "Order Placed!",
