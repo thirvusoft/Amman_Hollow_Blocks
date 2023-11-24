@@ -1,6 +1,6 @@
 import frappe
 from hollow_blocks.hollow_blocks.api.sitecartlist import get_item_image_attachments
-from erpnext.stock.get_item_details import get_item_price
+from erpnext.stock.get_item_details import get_item_price, get_price_list_rate
 
 @frappe.whitelist()
 def item_group_list():
@@ -152,32 +152,28 @@ def get_item_list():
     
     selling_price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list")
 
-    for item in item_list:	
-        item_price = get_item_price(
-            args= {
-                'price_list': selling_price_list,
-                'customer': frappe.db.get_value('Customer', {'user': frappe.session.user}, 'name'),
-                'uom': item.uom,
-                'transaction_date': frappe.utils.nowdate()
-            },
-            item_code = item.name
-        )
-        if not item_price:
-            get_item_price(
-            args= {
-                'customer': frappe.db.get_value('Customer', {'user': frappe.session.user}, 'name'),
-                'uom': item.uom,
-                'transaction_date': frappe.utils.nowdate()
-            },
-            item_code = item.name
-        )
+    for item in item_list:
+        args = frappe._dict({
+            "item_code": item.name,
+            "customer": frappe.db.get_value('Customer', {'user': frappe.session.user}, 'name'),
+            "quotation_to": "Customer",
+            "price_list": selling_price_list,
+            "order_type": "Sales",
+            "doctype": "Quotation",
+            "conversion_rate": 1,
+            "plc_conversion_rate": 1,
+            "conversion_factor": 1.0,
+            "uom": item.uom,
+        })
+
+        item_price = get_price_list_rate(args, frappe.get_doc("Item", item.name)).get('price_list_rate') or 0
 
         item.update({
             "currency": "₹",
             "favourite": f'"{frappe.session.user}"' in (frappe.db.get_value("Item", item.name, "_liked_by") or ""),
             "offer": (item_wise_offers.get(item.item_code) or {}).get('offer') or [],
             "offer_display": ", ".join((item_wise_offers.get(item.item_code) or {}).get('offer_display') or []),
-            "price_list_rate": item_price[0][1] if item_price else 0.0, 
+            "price_list_rate": item_price, 
             "image": get_item_image_attachments(item['item_code'], {}),
             "pricing_rules": (item_wise_offers.get(item.item_code) or {}).get('pricing_rules') or [],
             "offer_id": (item_wise_offers.get(item.item_code) or {}).get('offer_id') or []
