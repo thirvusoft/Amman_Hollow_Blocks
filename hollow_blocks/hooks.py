@@ -27,7 +27,7 @@ app_include_js = ["hollow_blocks.bundle.js"]
 
 # include js in page
 # page_js = {"page" : "public/js/file.js"}
-
+before_migrate="hollow_blocks.backup_file.file_override.file_override"
 # include js in doctype views
 doctype_js = {"Lead" : "hollow_blocks/custom/js/lead.js",
 "Opportunity" : "hollow_blocks/custom/js/opportunity.js",
